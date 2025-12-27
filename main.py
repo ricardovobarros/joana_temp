@@ -38,6 +38,14 @@ def clear_display():
     oled.fill(0)
     oled.show()
 
+def reverse_bits(byte):
+    """Inverte os bits de um byte (LSB <-> MSB)"""
+    result = 0
+    for i in range(8):
+        if byte & (1 << i):
+            result |= (1 << (7 - i))
+    return result
+
 def draw_large_char(char, x, y, scale=3):
     """Desenha um caractere grande (escala 3x)"""
     # Fonte 8x8 padrão, desenhada em escala maior
@@ -61,9 +69,10 @@ def draw_large_char(char, x, y, scale=3):
     
     pattern = font_8x8[char]
     for row in range(8):
+        # Inverte os bits de cada linha para corrigir espelhamento horizontal
+        reversed_row = reverse_bits(pattern[row])
         for col in range(8):
-            # Lê bits do MSB (bit 7) para LSB (bit 0) e desenha da esquerda para direita
-            if pattern[row] & (1 << (7 - col)):
+            if reversed_row & (1 << (7 - col)):
                 oled.fill_rect(x + col * scale, y + row * scale, scale, scale, 1)
 
 def display_temperature(temp):
