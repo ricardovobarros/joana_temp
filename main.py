@@ -22,6 +22,8 @@ pir = Pin(PIR_PIN, Pin.IN)
 # Variáveis de controle
 display_time = 0
 display_active = False
+last_dht_read = 0
+DHT_MIN_INTERVAL = 2000  # Mínimo de 2 segundos entre leituras do DHT
 
 def clear_display():
     """Limpa o display OLED"""
@@ -36,14 +38,33 @@ def display_temperature(temp):
     oled.show()
 
 def read_temperature():
-    """Lê a temperatura do sensor DHT"""
-    try:
-        dht_sensor.measure()
-        temp = dht_sensor.temperature()
-        return temp
-    except Exception as e:
-        print(f"Erro ao ler DHT: {e}")
+    """Lê a temperatura do sensor DHT com retry e controle de intervalo"""
+    global last_dht_read
+    
+    # Verifica se passou tempo suficiente desde a última leitura
+    current_time = time.ticks_ms()
+    time_since_last = time.ticks_diff(current_time, last_dht_read)
+    
+    if time_since_last < DHT_MIN_INTERVAL:
+        # Ainda não passou tempo suficiente, retorna None
         return None
+    
+    # Tenta ler o sensor com retry
+    for attempt in range(3):
+        try:
+            # Pequeno delay antes de medir
+            time.sleep_ms(50)
+            dht_sensor.measure()
+            temp = dht_sensor.temperature()
+            last_dht_read = current_time
+            return temp
+        except Exception as e:
+            if attempt < 2:  # Não é a última tentativa
+                time.sleep_ms(100)  # Espera um pouco antes de tentar novamente
+            else:
+                print(f"Erro ao ler DHT: {e}")
+    
+    return None
 
 # Limpa o display inicialmente
 clear_display()
@@ -65,10 +86,21 @@ while True:
             if temp is not None:
                 display_temperature(temp)
             else:
+                # Se não conseguiu ler, mostra mensagem de aguarde
                 oled.fill(0)
-                oled.text("Erro ao ler", 0, 0)
-                oled.text("temperatura", 0, 20)
+                oled.text("Aguardando...", 0, 0)
+                oled.text("sensor DHT", 0, 20)
                 oled.show()
+                # Tenta ler novamente após um delay
+                time.sleep_ms(500)
+                temp = read_temperature()
+                if temp is not None:
+                    display_temperature(temp)
+                else:
+                    oled.fill(0)
+                    oled.text("Erro ao ler", 0, 0)
+                    oled.text("temperatura", 0, 20)
+                    oled.show()
     
     # Verifica se passaram 8 segundos desde a ativação
     if display_active:
