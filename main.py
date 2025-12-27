@@ -1,7 +1,30 @@
-from machine import Pin, I2C
+from machine import Pin, I2C, freq, lightsleep
 from ssd1306 import SSD1306_I2C
 import dht
 import time
+
+# ===== ECONOMIA DE ENERGIA =====
+# Desabilita WiFi e Bluetooth para economizar bateria
+try:
+    import network
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(False)
+    wlan = network.WLAN(network.AP_IF)
+    wlan.active(False)
+except:
+    pass
+
+try:
+    import bluetooth
+    bluetooth.disable()
+except:
+    pass
+
+# Reduz frequência da CPU para economizar energia (80 MHz é suficiente)
+# Padrão é 240 MHz, reduzindo para 80 MHz economiza bastante
+freq(80000000)  # 80 MHz
+
+print("Modo economia de energia ativado")
 
 # Configuração dos pinos
 PIR_PIN = 27      # Sensor de movimento PIR
@@ -9,8 +32,8 @@ DHT_PIN = 4       # Sensor de temperatura DHT11/DHT22
 OLED_SDA = 21     # OLED SDA
 OLED_SCL = 22     # OLED SCL
 
-# Configuração do display OLED
-i2c = I2C(0, scl=Pin(OLED_SCL), sda=Pin(OLED_SDA), freq=400000)
+# Configuração do display OLED (frequência reduzida quando não em uso)
+i2c = I2C(0, scl=Pin(OLED_SCL), sda=Pin(OLED_SDA), freq=100000)  # 100kHz é suficiente
 oled = SSD1306_I2C(128, 64, i2c)
 
 # Configuração do sensor DHT
@@ -152,9 +175,9 @@ def read_temperature():
 # Limpa o display inicialmente
 clear_display()
 
+# Loop principal com economia de energia
 print("Sistema iniciado. Aguardando detecção de movimento...")
 
-# Loop principal
 while True:
     # Verifica se há movimento detectado
     if pir.value() == 1:
@@ -194,6 +217,14 @@ while True:
             display_active = False
             print("Display desativado após 8 segundos")
     
-    # Pequeno delay para não sobrecarregar o processador
-    time.sleep_ms(100)
+    # ECONOMIA DE ENERGIA: Light sleep quando não há movimento
+    # O ESP32 entra em modo de baixo consumo mas mantém a RAM
+    # Acorda automaticamente quando há interrupção (movimento do PIR)
+    if not display_active:
+        # Light sleep por 100ms - economiza bastante energia
+        # O PIR pode acordar o ESP32 via interrupção se configurado
+        lightsleep(100)  # Sleep por 100ms quando não há atividade
+    else:
+        # Quando display está ativo, apenas um pequeno delay
+        time.sleep_ms(50)
 
