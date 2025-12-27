@@ -14,7 +14,9 @@ i2c = I2C(0, scl=Pin(OLED_SCL), sda=Pin(OLED_SDA), freq=400000)
 oled = SSD1306_I2C(128, 64, i2c)
 
 # Configuração do sensor DHT
-dht_sensor = dht.DHT11(Pin(DHT_PIN))  # Se for DHT22, troque para dht.DHT22(Pin(DHT_PIN))
+# O DHT precisa de pull-up, mas o módulo geralmente já tem
+dht_pin = Pin(DHT_PIN, Pin.IN, Pin.PULL_UP)
+dht_sensor = dht.DHT11(dht_pin)  # Se for DHT22, troque para dht.DHT22(dht_pin)
 
 # Configuração do sensor PIR
 pir = Pin(PIR_PIN, Pin.IN)
@@ -24,6 +26,12 @@ display_time = 0
 display_active = False
 last_dht_read = 0
 DHT_MIN_INTERVAL = 2000  # Mínimo de 2 segundos entre leituras do DHT
+dht_initialized = False
+
+# Inicialização do DHT - dá tempo para o sensor estabilizar
+print("Inicializando sensor DHT...")
+time.sleep(2)  # Dá tempo para o sensor estabilizar (equivalente ao begin() do Arduino)
+dht_initialized = True
 
 def clear_display():
     """Limpa o display OLED"""
@@ -39,7 +47,10 @@ def display_temperature(temp):
 
 def read_temperature():
     """Lê a temperatura do sensor DHT com retry e controle de intervalo"""
-    global last_dht_read
+    global last_dht_read, dht_initialized
+    
+    if not dht_initialized:
+        return None
     
     # Verifica se passou tempo suficiente desde a última leitura
     current_time = time.ticks_ms()
@@ -52,17 +63,29 @@ def read_temperature():
     # Tenta ler o sensor com retry
     for attempt in range(3):
         try:
-            # Pequeno delay antes de medir
-            time.sleep_ms(50)
+            # Delay antes de medir (o DHT precisa de tempo para responder)
+            time.sleep_ms(100)
             dht_sensor.measure()
+            # Pequeno delay após measure() antes de ler
+            time.sleep_ms(50)
             temp = dht_sensor.temperature()
-            last_dht_read = current_time
-            return temp
-        except Exception as e:
-            if attempt < 2:  # Não é a última tentativa
-                time.sleep_ms(100)  # Espera um pouco antes de tentar novamente
+            
+            # Verifica se o valor é válido (equivalente ao isnan() do Arduino)
+            # DHT11: -40 a 80°C, DHT22: -40 a 125°C
+            if temp is not None and -40 <= temp <= 125:
+                last_dht_read = current_time
+                return temp
             else:
-                print(f"Erro ao ler DHT: {e}")
+                print(f"Valor inválido lido: {temp}")
+        except OSError as e:
+            # Timeout ou erro de comunicação
+            if attempt < 2:  # Não é a última tentativa
+                time.sleep_ms(200)  # Espera mais antes de tentar novamente
+            else:
+                print(f"Erro ao ler DHT (tentativa {attempt + 1}/3): {e}")
+        except Exception as e:
+            print(f"Erro inesperado ao ler DHT: {e}")
+            break
     
     return None
 
@@ -87,12 +110,13 @@ while True:
                 display_temperature(temp)
             else:
                 # Se não conseguiu ler, mostra mensagem de aguarde
+                # e tenta novamente após esperar o intervalo mínimo
                 oled.fill(0)
                 oled.text("Aguardando...", 0, 0)
                 oled.text("sensor DHT", 0, 20)
                 oled.show()
-                # Tenta ler novamente após um delay
-                time.sleep_ms(500)
+                # Espera o intervalo mínimo antes de tentar novamente
+                time.sleep_ms(DHT_MIN_INTERVAL)
                 temp = read_temperature()
                 if temp is not None:
                     display_temperature(temp)

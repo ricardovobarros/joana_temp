@@ -2,6 +2,7 @@
 __pycache__/
 *.py[codz]
 *$py.class
+Project_9_ESP32_DHT11_Web_Server/
 
 # C extensions
 *.so
