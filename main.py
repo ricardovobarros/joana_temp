@@ -62,8 +62,8 @@ def draw_large_char(char, x, y, scale=3):
     pattern = font_8x8[char]
     for row in range(8):
         for col in range(8):
-            if pattern[row] & (1 << (7 - col)):
-                # Desenha pixel escalado
+            if pattern[7 - row] & (1 << (7 - col)):
+                # Desenha pixel escalado (invertendo a ordem das linhas para corrigir espelhamento)
                 oled.fill_rect(x + col * scale, y + row * scale, scale, scale, 1)
 
 def display_temperature(temp):
