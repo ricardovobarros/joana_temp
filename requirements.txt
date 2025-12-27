@@ -1,0 +1,10 @@
+# Bibliotecas necessárias para o MicroPython
+# Instale via upip ou copie os arquivos para o ESP32
+
+# SSD1306 OLED Driver
+# Baixe de: https://github.com/micropython/micropython-lib/tree/master/micropython/drivers/display/ssd1306
+# Ou instale via: upip.install('micropython-ssd1306')
+
+# DHT driver já vem incluído no MicroPython, mas pode precisar de:
+# https://github.com/micropython/micropython-lib/tree/master/micropython/drivers/sensor/dht
+
