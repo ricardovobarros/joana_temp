@@ -38,11 +38,62 @@ def clear_display():
     oled.fill(0)
     oled.show()
 
+def draw_large_char(char, x, y, scale=3):
+    """Desenha um caractere grande (escala 3x)"""
+    # Fonte 8x8 padrão, desenhada em escala maior
+    font_8x8 = {
+        '0': [0x3E, 0x63, 0x73, 0x7B, 0x6F, 0x67, 0x63, 0x3E],
+        '1': [0x18, 0x1C, 0x18, 0x18, 0x18, 0x18, 0x18, 0x7E],
+        '2': [0x3E, 0x63, 0x60, 0x38, 0x0E, 0x03, 0x63, 0x7F],
+        '3': [0x3E, 0x63, 0x60, 0x3C, 0x60, 0x60, 0x63, 0x3E],
+        '4': [0x30, 0x38, 0x3C, 0x36, 0x33, 0x7F, 0x30, 0x30],
+        '5': [0x7F, 0x03, 0x03, 0x3F, 0x60, 0x60, 0x63, 0x3E],
+        '6': [0x3E, 0x63, 0x03, 0x3F, 0x63, 0x63, 0x63, 0x3E],
+        '7': [0x7F, 0x63, 0x60, 0x30, 0x18, 0x0C, 0x0C, 0x0C],
+        '8': [0x3E, 0x63, 0x63, 0x3E, 0x63, 0x63, 0x63, 0x3E],
+        '9': [0x3E, 0x63, 0x63, 0x63, 0x7E, 0x60, 0x63, 0x3E],
+        '-': [0x00, 0x00, 0x00, 0x7F, 0x7F, 0x00, 0x00, 0x00],
+        '.': [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C],
+    }
+    
+    if char not in font_8x8:
+        return
+    
+    pattern = font_8x8[char]
+    for row in range(8):
+        for col in range(8):
+            if pattern[row] & (1 << (7 - col)):
+                # Desenha pixel escalado
+                oled.fill_rect(x + col * scale, y + row * scale, scale, scale, 1)
+
 def display_temperature(temp):
-    """Mostra a temperatura no display OLED"""
+    """Mostra a temperatura grande e centralizada no display OLED"""
     oled.fill(0)
-    oled.text("Temperatura:", 0, 0)
-    oled.text(f"{temp} C", 0, 20)
+    
+    # Formata a temperatura como string inteira (ex: "23")
+    temp_str = f"{int(round(temp))}"
+    
+    # Calcula o tamanho total do texto
+    scale = 3  # Escala 3x para números bem grandes
+    char_width = 8 * scale
+    char_spacing = 3  # Espaço entre caracteres
+    total_width = len(temp_str) * char_width + (len(temp_str) - 1) * char_spacing
+    
+    # Centraliza horizontalmente (tela tem 128 pixels)
+    start_x = (128 - total_width) // 2
+    
+    # Centraliza verticalmente (tela tem 64 pixels, altura do caractere é 8*scale = 24)
+    start_y = (64 - 8 * scale) // 2
+    
+    # Desenha cada caractere
+    x_offset = 0
+    for char in temp_str:
+        draw_large_char(char, start_x + x_offset, start_y, scale)
+        x_offset += char_width + char_spacing
+    
+    # Adiciona o símbolo "C" pequeno ao lado
+    oled.text("C", start_x + x_offset + 5, start_y + 8 * scale - 8)
+    
     oled.show()
 
 def read_temperature():
