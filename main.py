@@ -179,9 +179,11 @@ clear_display()
 print("Sistema iniciado. Aguardando detecção de movimento...")
 
 while True:
-    # Verifica se há movimento detectado
-    if pir.value() == 1:
-        if not display_active:
+    # IMPORTANTE: Só verifica o PIR quando a tela NÃO está ativa
+    # Isso evita que o brilho da tela OLED ative o sensor PIR causando loop
+    if not display_active:
+        # Verifica se há movimento detectado apenas quando tela está desligada
+        if pir.value() == 1:
             # Movimento detectado - ativa o display
             display_active = True
             display_time = time.ticks_ms()
@@ -216,6 +218,8 @@ while True:
             clear_display()
             display_active = False
             print("Display desativado após 8 segundos")
+            # Pequeno delay após desligar para garantir que PIR estabilize
+            time.sleep_ms(500)
     
     # ECONOMIA DE ENERGIA: Light sleep quando não há movimento
     # O ESP32 entra em modo de baixo consumo mas mantém a RAM

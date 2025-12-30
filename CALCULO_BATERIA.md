@@ -106,3 +106,5 @@ Se quiser mais duração, considere:
 - **Bateria LiPo 3.7V 5000 mAh**: ~12-15 dias de uso moderado
 - Não precisa de regulador (usa diretamente 3.3V ou com step-down eficiente)
 
+
+
