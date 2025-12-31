@@ -102,8 +102,8 @@ def display_temperature(temp):
     """Mostra a temperatura grande e centralizada no display OLED"""
     oled.fill(0)
     
-    # Formata a temperatura como string inteira (ex: "23")
-    temp_str = f"{int(round(temp))}"
+    # Formata a temperatura com 1 casa decimal (ex: "23.5")
+    temp_str = f"{temp:.1f}"
     
     # Calcula o tamanho total do texto
     scale = 3  # Escala 3x para números bem grandes
@@ -120,7 +120,11 @@ def display_temperature(temp):
     # Desenha cada caractere
     x_offset = 0
     for char in temp_str:
-        draw_large_char(char, start_x + x_offset, start_y, scale)
+        if char == '.':
+            # O ponto decimal é menor, ajusta a posição vertical
+            draw_large_char(char, start_x + x_offset, start_y + 8 * scale - 8, scale)
+        else:
+            draw_large_char(char, start_x + x_offset, start_y, scale)
         x_offset += char_width + char_spacing
     
     # Adiciona o símbolo "C" pequeno ao lado
