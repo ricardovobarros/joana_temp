@@ -104,31 +104,50 @@ def display_temperature(temp):
     
     # Formata a temperatura com 1 casa decimal (ex: "23.5")
     temp_str = f"{temp:.1f}"
+    parts = temp_str.split('.')
+    integer_part = parts[0]
+    decimal_part = parts[1] if len(parts) > 1 else ""
     
-    # Calcula o tamanho total do texto
-    scale = 3  # Escala 3x para números bem grandes
-    char_width = 8 * scale
-    char_spacing = 3  # Espaço entre caracteres
-    total_width = len(temp_str) * char_width + (len(temp_str) - 1) * char_spacing
+    # Escalas diferentes: números grandes e decimal menor
+    scale_large = 3  # Escala 3x para números principais
+    scale_small = 1  # Escala 1x (metade visual) para decimal
+    
+    # Calcula larguras
+    char_width_large = 8 * scale_large
+    char_width_small = 8 * scale_small
+    char_spacing = 3
+    
+    # Calcula largura total
+    total_width = (len(integer_part) * char_width_large + 
+                   (len(integer_part) - 1) * char_spacing +
+                   char_width_small +  # ponto decimal
+                   char_spacing +
+                   char_width_small)  # dígito decimal
     
     # Centraliza horizontalmente (tela tem 128 pixels)
     start_x = (128 - total_width) // 2
     
-    # Centraliza verticalmente (tela tem 64 pixels, altura do caractere é 8*scale = 24)
-    start_y = (64 - 8 * scale) // 2
+    # Centraliza verticalmente (tela tem 64 pixels, altura do caractere grande é 8*scale = 24)
+    start_y = (64 - 8 * scale_large) // 2
     
-    # Desenha cada caractere
+    # Desenha parte inteira (números grandes)
     x_offset = 0
-    for char in temp_str:
-        if char == '.':
-            # O ponto decimal é menor, ajusta a posição vertical
-            draw_large_char(char, start_x + x_offset, start_y + 8 * scale - 8, scale)
-        else:
-            draw_large_char(char, start_x + x_offset, start_y, scale)
-        x_offset += char_width + char_spacing
+    for char in integer_part:
+        draw_large_char(char, start_x + x_offset, start_y, scale_large)
+        x_offset += char_width_large + char_spacing
+    
+    # Desenha ponto decimal (pequeno, alinhado na base)
+    decimal_y = start_y + 8 * scale_large - 8 * scale_small
+    draw_large_char('.', start_x + x_offset, decimal_y, scale_small)
+    x_offset += char_width_small + char_spacing
+    
+    # Desenha dígito decimal (pequeno, alinhado na base)
+    if decimal_part:
+        draw_large_char(decimal_part[0], start_x + x_offset, decimal_y, scale_small)
+        x_offset += char_width_small
     
     # Adiciona o símbolo "C" pequeno ao lado
-    oled.text("C", start_x + x_offset + 5, start_y + 8 * scale - 8)
+    oled.text("C", start_x + x_offset + 5, start_y + 8 * scale_large - 8)
     
     oled.show()
 
