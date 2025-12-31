@@ -2,6 +2,7 @@ from machine import Pin, I2C, freq, lightsleep
 from ssd1306 import SSD1306_I2C
 import dht
 import time
+import random
 
 # ===== ECONOMIA DE ENERGIA =====
 # Desabilita WiFi e Bluetooth para economizar bateria
@@ -50,6 +51,7 @@ display_active = False
 last_dht_read = 0
 DHT_MIN_INTERVAL = 2000  # Mínimo de 2 segundos entre leituras do DHT
 dht_initialized = False
+last_decimal = None  # Armazena o último valor decimal gerado
 
 # Inicialização do DHT - dá tempo para o sensor estabilizar
 print("Inicializando sensor DHT...")
@@ -151,6 +153,34 @@ def display_temperature(temp):
     
     oled.show()
 
+def adjust_temperature_decimal(temp):
+    """Ajusta o valor decimal da temperatura com lógica aleatória"""
+    global last_decimal
+    
+    if temp is None:
+        return None
+    
+    # Separa parte inteira e decimal original
+    temp_int = int(temp)
+    temp_decimal_original = int((temp - temp_int) * 10)
+    
+    # Gera novo valor decimal
+    if last_decimal is None:
+        # Primeira leitura: valor aleatório entre 0 e 9
+        new_decimal = random.randint(0, 9)
+    else:
+        # Leituras seguintes: varia do valor anterior por um valor aleatório entre -2 e +2
+        variation = random.randint(-2, 2)
+        new_decimal = last_decimal + variation
+        # Garante que fique entre 0 e 9
+        new_decimal = max(0, min(9, new_decimal))
+    
+    # Armazena para próxima leitura
+    last_decimal = new_decimal
+    
+    # Retorna temperatura com novo decimal
+    return temp_int + (new_decimal / 10.0)
+
 def read_temperature():
     """Lê a temperatura do sensor DHT com retry e controle de intervalo"""
     global last_dht_read, dht_initialized
@@ -180,7 +210,8 @@ def read_temperature():
             # DHT11: -40 a 80°C, DHT22: -40 a 125°C
             if temp is not None and -40 <= temp <= 125:
                 last_dht_read = current_time
-                return temp
+                # Ajusta o valor decimal com lógica aleatória
+                return adjust_temperature_decimal(temp)
             else:
                 print(f"Valor inválido lido: {temp}")
         except OSError as e:
