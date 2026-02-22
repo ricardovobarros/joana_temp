@@ -112,7 +112,7 @@ def display_temperature(temp):
     
     # Escalas diferentes: números grandes e decimal menor
     scale_large = 3  # Escala 3x para números principais
-    scale_small = 1  # Escala 1x (metade visual) para decimal
+    scale_small = 2  # Escala 2x para decimal (aumentado de 1 para 2)
     
     # Calcula larguras
     char_width_large = 8 * scale_large
