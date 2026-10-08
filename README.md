@@ -63,6 +63,7 @@ dht_sensor = dht.DHT22(Pin(DHT_PIN))  # Troque DHT11 por DHT22
 
 ## Notas
 
-- O sensor PIR pode ter um pequeno delay após ser ligado (aquecimento)
+- O sensor PIR pode ter um pequeno delay após ser ligado (resfriamento) - isso deve dar conflito.
 - Se o DHT não ler corretamente, verifique as conexões (fios curtos recomendados)
+- Essa e uma nova nota que nao deve dar conflito
 - Todos os componentes devem compartilhar o mesmo GND
