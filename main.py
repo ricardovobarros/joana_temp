@@ -273,7 +273,7 @@ while True:
             display_active = False
             print("Display desativado após 8 segundos")
             # Pequeno delay após desligar para garantir que PIR estabilize
-            time.sleep_ms(500)
+            time.sleep_ms(10000)
     
     # ECONOMIA DE ENERGIA: Light sleep quando não há movimento
     # O ESP32 entra em modo de baixo consumo mas mantém a RAM
