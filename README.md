@@ -4,7 +4,7 @@ Sistema MicroPython para ESP32 que exibe a temperatura no display OLED quando de
 
 ## Componentes
 
-- **ESP32 Dev Module**
+- **ESP32 Dev Module** - conflit main
 - **Sensor PIR** (HC-SR501) - GPIO 27
 - **Display OLED I2C** (SSD1306 128x64) - GPIO 21 (SDA), GPIO 22 (SCL)
 - **Sensor DHT11/DHT22** - GPIO 4

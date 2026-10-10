@@ -5,7 +5,7 @@ import time
 import random
 
 # ===== ECONOMIA DE ENERGIA =====
-# Desabilita WiFi e Bluetooth para economizar bateria
+# Desabilita WiFi e Bluetooth para economizar bateria - conflit main.py
 try:
     import network
     wlan = network.WLAN(network.STA_IF)
