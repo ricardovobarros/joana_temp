@@ -1,6 +1,6 @@
 # Sistema de Monitoramento de Temperatura com Detecção de Movimento
 
-Sistema MicroPython para ESP32 que exibe a temperatura no display OLED quando detecta movimento.
+Sistema MicroPython para ESP32 que exibe a temperatura no display OLED quando detecta movimento. conflito main.
 
 ## Componentes
 
