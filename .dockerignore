@@ -1,0 +1,9 @@
+.git
+firmware
+supabase
+**/__pycache__
+backend/.venv
+backend/.env
+backend/static
+web/build
+web/.dart_tool

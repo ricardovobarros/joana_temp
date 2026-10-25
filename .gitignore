@@ -2,7 +2,9 @@
 __pycache__/
 *.py[codz]
 *$py.class
-Project_9_ESP32_DHT11_Web_Server/
+
+# Credenciais do firmware (WiFi, MQTT)
+firmware/config.py
 
 # C extensions
 *.so
@@ -15,8 +17,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
