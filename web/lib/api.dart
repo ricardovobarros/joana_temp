@@ -1,18 +1,14 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:web/web.dart' as web;
 
 const _apiBase = String.fromEnvironment('API_BASE');
-const _storageKey = 'joana_password';
 
 class ApiException implements Exception {
   ApiException(this.statusCode, this.message);
 
   final int statusCode;
   final String message;
-
-  bool get unauthorized => statusCode == 401;
 
   @override
   String toString() => message;
@@ -71,18 +67,8 @@ class Dashboard {
 }
 
 class Api {
-  static String? get savedPassword =>
-      web.window.sessionStorage.getItem(_storageKey);
-
-  static void logout() => web.window.sessionStorage.removeItem(_storageKey);
-
   static Uri _uri(String path) =>
       _apiBase.isEmpty ? Uri.base.resolve(path) : Uri.parse('$_apiBase$path');
-
-  static Map<String, String> _headers() => {
-        'Content-Type': 'application/json',
-        'X-App-Password': savedPassword ?? '',
-      };
 
   static Never _fail(http.Response response) {
     String message = 'Erro ${response.statusCode}';
@@ -93,18 +79,8 @@ class Api {
     throw ApiException(response.statusCode, message);
   }
 
-  static Future<void> login(String password) async {
-    final response = await http.post(
-      _uri('/api/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'password': password}),
-    );
-    if (response.statusCode != 200) _fail(response);
-    web.window.sessionStorage.setItem(_storageKey, password);
-  }
-
   static Future<Dashboard> dashboard() async {
-    final response = await http.get(_uri('/api/dashboard'), headers: _headers());
+    final response = await http.get(_uri('/api/dashboard'));
     if (response.statusCode != 200) _fail(response);
     return Dashboard.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -112,7 +88,7 @@ class Api {
   static Future<void> setTimer(bool on) async {
     final response = await http.post(
       _uri('/api/timer'),
-      headers: _headers(),
+      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'action': on ? 'start' : 'stop'}),
     );
     if (response.statusCode != 200) _fail(response);

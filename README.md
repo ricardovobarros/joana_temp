@@ -1,6 +1,6 @@
 # joana_temp: timer e temperatura do quarto
 
-Um ESP32 com um botão e um ecrã OLED funciona como timer (até 12 horas) e mede a temperatura do quarto a cada 15 minutos. Os dados vão por MQTT (EMQX Serverless) para um backend no Fly.io, que os grava no Supabase e serve um site Flutter com senha.
+Um ESP32 com um botão e um ecrã OLED funciona como timer (até 12 horas) e mede a temperatura do quarto a cada 15 minutos. Os dados vão por MQTT (EMQX Serverless) para um backend no Fly.io, que os grava no Supabase e serve um site Flutter.
 
 ```
 ESP32 --MQTT/TLS--> EMQX Serverless <--MQTT/TLS--> Backend Python (Fly.io) --> Supabase
@@ -14,7 +14,7 @@ ESP32 --MQTT/TLS--> EMQX Serverless <--MQTT/TLS--> Backend Python (Fly.io) --> S
 |---|---|
 | `firmware/` | MicroPython do ESP32 (`main.py`, `ssd1306.py`, `config.example.py`) |
 | `backend/` | FastAPI + ponte MQTT -> Supabase; também serve o site |
-| `web/` | Site Flutter (login + gráficos + timer) |
+| `web/` | Site Flutter (gráficos + timer) |
 | `supabase/schema.sql` | Tabelas da base de dados |
 | `Dockerfile`, `fly.toml` | Deploy no Fly.io |
 
@@ -115,8 +115,6 @@ O `backend/.env` (ver `backend/.env.example`) tem de ter estas variáveis:
 | `MQTT_PORT` | `8883` |
 | `MQTT_USER` | `backend` |
 | `MQTT_PASS` | senha da credencial `backend` |
-| `APP_PASSWORD` | `Quartojojo` |
-
 Depois, na pasta `joana_temp`:
 
 ```bash
@@ -148,11 +146,10 @@ Abre [http://localhost:8000](http://localhost:8000).
 
 ## API do backend
 
-Todos os pedidos, exceto `/api/login` e `/api/health`, precisam do header `X-App-Password`.
+O site e a API são públicos: quem tiver o URL vê os dados e pode ligar ou desligar o timer.
 
 | Método | Caminho | Descrição |
 |---|---|---|
-| `POST` | `/api/login` | `{"password": "..."}` -> 200 ou 401 |
 | `GET` | `/api/dashboard` | leituras dos últimos 7 dias, estado do ESP32 e última sessão do timer |
 | `POST` | `/api/timer` | `{"action": "start"}` ou `{"action": "stop"}` |
 | `GET` | `/api/health` | verificação de saúde do Fly.io |

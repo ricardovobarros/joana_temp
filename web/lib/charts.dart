@@ -58,8 +58,10 @@ List<DayBucket> dailyMinMax(List<Reading> readings, DateTime now) {
   return (low, high);
 }
 
-Widget _axisLabel(TitleMeta meta, String text) => SideTitleWidget(
+Widget _axisLabel(TitleMeta meta, String text, {bool vertical = false}) =>
+    SideTitleWidget(
       meta: meta,
+      angle: vertical ? -pi / 2 : 0,
       child: Text(text, style: const TextStyle(fontSize: 11)),
     );
 
@@ -77,7 +79,7 @@ FlTitlesData _titles(Widget Function(double, TitleMeta) bottom) => FlTitlesData(
       bottomTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 28,
+          reservedSize: 48,
           getTitlesWidget: bottom,
         ),
       ),
@@ -103,8 +105,9 @@ class HourlyTemperatureChart extends StatelessWidget {
         borderData: FlBorderData(show: false),
         titlesData: _titles((value, meta) {
           final i = value.toInt();
-          if (i % 3 != 0 || i >= buckets.length) return const SizedBox.shrink();
-          return _axisLabel(meta, hourFormat.format(buckets[i].start));
+          if (i % 2 != 0 || i >= buckets.length) return const SizedBox.shrink();
+          return _axisLabel(meta, hourFormat.format(buckets[i].start),
+              vertical: true);
         }),
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(
@@ -158,7 +161,8 @@ class DailyMinMaxChart extends StatelessWidget {
           final i = value.toInt();
           if (i >= buckets.length) return const SizedBox.shrink();
           final day = buckets[i].day;
-          return _axisLabel(meta, '${_weekdays[day.weekday - 1]} ${day.day}');
+          return _axisLabel(meta, '${_weekdays[day.weekday - 1]} ${day.day}',
+              vertical: true);
         }),
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(

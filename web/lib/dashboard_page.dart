@@ -7,9 +7,7 @@ import 'charts.dart';
 import 'timer_card.dart';
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key, required this.onLogout});
-
-  final VoidCallback onLogout;
+  const DashboardPage({super.key});
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -50,10 +48,6 @@ class _DashboardPageState extends State<DashboardPage> {
         _now = DateTime.now();
       });
     } on ApiException catch (e) {
-      if (e.unauthorized) {
-        widget.onLogout();
-        return;
-      }
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
       if (mounted) setState(() => _error = 'Sem ligação ao servidor');
@@ -89,11 +83,6 @@ class _DashboardPageState extends State<DashboardPage> {
             tooltip: 'Atualizar',
             icon: const Icon(Icons.refresh),
             onPressed: _load,
-          ),
-          IconButton(
-            tooltip: 'Sair',
-            icon: const Icon(Icons.logout),
-            onPressed: widget.onLogout,
           ),
         ],
       ),

@@ -51,15 +51,7 @@ class TimerCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Icon(running ? Icons.timer : Icons.timer_off_outlined,
-                    color: running ? theme.colorScheme.primary : null),
-                const SizedBox(width: 8),
-                Text(running ? 'Timer ativo' : 'Timer desligado',
-                    style: theme.textTheme.titleMedium),
-              ],
-            ),
+            Text('👶🍼 Último tête', style: theme.textTheme.titleMedium),
             const SizedBox(height: 16),
             Text(
               formatHoursMinutes(duration),
