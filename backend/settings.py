@@ -18,5 +18,6 @@ MQTT_USER = _required("MQTT_USER")
 MQTT_PASS = _required("MQTT_PASS")
 MQTT_CLIENT_ID = os.environ.get("MQTT_CLIENT_ID", "joana-backend")
 TOPIC_PREFIX = os.environ.get("TOPIC_PREFIX", "joana")
+PLUG_TOPIC_PREFIX = os.environ.get("PLUG_TOPIC_PREFIX", f"{TOPIC_PREFIX}/plug")
 
 STATIC_DIR = Path(os.environ.get("STATIC_DIR", Path(__file__).parent / "static"))

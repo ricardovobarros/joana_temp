@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'charts.dart';
+import 'fan_card.dart';
 import 'timer_card.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -17,6 +18,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Dashboard? _data;
   String? _error;
   bool _busy = false;
+  bool _fanBusy = false;
   DateTime _now = DateTime.now();
   Timer? _refreshTimer;
   Timer? _clockTimer;
@@ -71,6 +73,22 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Future<void> _setFanPlug(bool plugOn) async {
+    setState(() => _fanBusy = true);
+    try {
+      await Api.setFanPlug(plugOn);
+      await Future.delayed(const Duration(seconds: 2));
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Falhou: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _fanBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = _data;
@@ -102,6 +120,11 @@ class _DashboardPageState extends State<DashboardPage> {
       now: _now,
       busy: _busy,
       onToggle: _toggleTimer,
+    );
+    final fanCard = FanCard(
+      fan: data.fan,
+      busy: _fanBusy,
+      onSetPlug: _setFanPlug,
     );
     final charts = Column(
       children: [
@@ -137,11 +160,22 @@ class _DashboardPageState extends State<DashboardPage> {
                 children: [
                   Expanded(child: charts),
                   const SizedBox(width: 16),
-                  SizedBox(width: 300, child: timerCard),
+                  SizedBox(
+                    width: 300,
+                    child: Column(
+                      children: [
+                        timerCard,
+                        const SizedBox(height: 16),
+                        fanCard,
+                      ],
+                    ),
+                  ),
                 ],
               )
             else ...[
               timerCard,
+              const SizedBox(height: 16),
+              fanCard,
               const SizedBox(height: 16),
               charts,
             ],

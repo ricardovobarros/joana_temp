@@ -1,3 +1,4 @@
+import itertools
 import json
 import logging
 import threading
@@ -7,6 +8,7 @@ import certifi
 import paho.mqtt.client as mqtt
 
 import db
+import fan_speeds
 import settings
 
 log = logging.getLogger("mqtt_bridge")
@@ -16,12 +18,28 @@ TOPIC_STATE = f"{settings.TOPIC_PREFIX}/timer/state"
 TOPIC_CMD = f"{settings.TOPIC_PREFIX}/timer/cmd"
 TOPIC_STATUS = f"{settings.TOPIC_PREFIX}/status"
 
+# Shelly Plug M Gen3 (API Gen2+). As respostas RPC chegam em "<src>/rpc".
+TOPIC_PLUG_ONLINE = f"{settings.PLUG_TOPIC_PREFIX}/online"
+TOPIC_PLUG_STATUS = f"{settings.PLUG_TOPIC_PREFIX}/status/switch:0"
+TOPIC_PLUG_EVENTS = f"{settings.PLUG_TOPIC_PREFIX}/events/rpc"
+TOPIC_PLUG_RPC = f"{settings.PLUG_TOPIC_PREFIX}/rpc"
+TOPIC_PLUG_REPLIES = f"{settings.MQTT_CLIENT_ID}/rpc"
+
 # Diferença máxima para considerar que duas horas de início são o mesmo timer
 SAME_SESSION_TOLERANCE = timedelta(minutes=2)
+
+PLUG_POLL_S = 30
+# Sem notícias da tomada há mais do que isto, conta como offline
+PLUG_STALE = timedelta(seconds=PLUG_POLL_S * 3)
 
 _lock = threading.Lock()
 device_online = None
 _client = None
+
+_plug_lock = threading.Lock()
+_plug = {"online": None, "output": None, "watts": None, "updated_at": None}
+_rpc_ids = itertools.count(1)
+_stop = threading.Event()
 
 
 def _handle_temp(payload: dict):
@@ -69,12 +87,62 @@ def _handle_state(payload: dict, retained: bool):
     log.info("Timer %s (%s)", event, payload.get("reason"))
 
 
+def _update_plug(status: dict):
+    with _plug_lock:
+        if "output" in status:
+            _plug["output"] = bool(status["output"])
+        if "apower" in status:
+            _plug["watts"] = float(status["apower"])
+        _plug["updated_at"] = db.now_utc()
+
+
+def _handle_plug(topic: str, text: str):
+    if topic == TOPIC_PLUG_ONLINE:
+        with _plug_lock:
+            _plug["online"] = text.strip() == "true"
+        return
+    message = json.loads(text)
+    if topic == TOPIC_PLUG_STATUS:
+        _update_plug(message)
+    elif topic == TOPIC_PLUG_EVENTS:
+        if message.get("method") in ("NotifyStatus", "NotifyFullStatus"):
+            switch = message.get("params", {}).get("switch:0")
+            if switch:
+                _update_plug(switch)
+    elif topic == TOPIC_PLUG_REPLIES:
+        if "error" in message:
+            log.warning("Erro RPC da tomada: %s", message["error"])
+            return
+        result = message.get("result")
+        if isinstance(result, dict) and ("output" in result or "apower" in result):
+            _update_plug(result)
+
+
+def _plug_rpc(method: str, params: dict) -> bool:
+    if _client is None or not _client.is_connected():
+        return False
+    request = {"id": next(_rpc_ids), "src": settings.MQTT_CLIENT_ID,
+               "method": method, "params": params}
+    info = _client.publish(TOPIC_PLUG_RPC, json.dumps(request), qos=1)
+    return info.rc == mqtt.MQTT_ERR_SUCCESS
+
+
+def _poll_plug():
+    while not _stop.wait(PLUG_POLL_S):
+        _plug_rpc("Switch.GetStatus", {"id": 0})
+
+
 def _on_connect(client, userdata, flags, reason_code, properties):
     if reason_code.is_failure:
         log.error("Falha ao ligar ao MQTT: %s", reason_code)
         return
     log.info("Ligado ao MQTT %s", settings.MQTT_HOST)
-    client.subscribe([(TOPIC_TEMP, 1), (TOPIC_STATE, 1), (TOPIC_STATUS, 1)])
+    client.subscribe([
+        (TOPIC_TEMP, 1), (TOPIC_STATE, 1), (TOPIC_STATUS, 1),
+        (TOPIC_PLUG_ONLINE, 1), (TOPIC_PLUG_STATUS, 1),
+        (TOPIC_PLUG_EVENTS, 1), (TOPIC_PLUG_REPLIES, 1),
+    ])
+    _plug_rpc("Switch.GetStatus", {"id": 0})
 
 
 def _on_message(client, userdata, msg):
@@ -83,6 +151,10 @@ def _on_message(client, userdata, msg):
         text = msg.payload.decode()
         if msg.topic == TOPIC_STATUS:
             device_online = text == "online"
+            return
+        if msg.topic in (TOPIC_PLUG_ONLINE, TOPIC_PLUG_STATUS,
+                         TOPIC_PLUG_EVENTS, TOPIC_PLUG_REPLIES):
+            _handle_plug(msg.topic, text)
             return
         payload = json.loads(text)
         with _lock:
@@ -106,9 +178,11 @@ def start():
     client.connect_async(settings.MQTT_HOST, settings.MQTT_PORT, keepalive=60)
     client.loop_start()
     _client = client
+    threading.Thread(target=_poll_plug, name="plug-poll", daemon=True).start()
 
 
 def stop():
+    _stop.set()
     if _client is not None:
         _client.loop_stop()
         _client.disconnect()
@@ -119,3 +193,31 @@ def send_command(action: str) -> bool:
         return False
     info = _client.publish(TOPIC_CMD, action, qos=1, retain=False)
     return info.rc == mqtt.MQTT_ERR_SUCCESS
+
+
+def fan_status() -> dict:
+    with _plug_lock:
+        plug = dict(_plug)
+    updated_at = plug["updated_at"]
+    fresh = updated_at is not None and db.now_utc() - updated_at < PLUG_STALE
+    online = plug["online"] is not False and fresh
+    if not online:
+        state, speed = "unknown", None
+    elif plug["output"] is False:
+        state, speed = "off", None
+    else:
+        state, speed = fan_speeds.classify(plug["watts"])
+    return {
+        "plug_online": online,
+        "plug_on": plug["output"],
+        "watts": plug["watts"],
+        "state": state,
+        "speed": speed,
+    }
+
+
+def set_plug(on: bool) -> bool:
+    if not _plug_rpc("Switch.Set", {"id": 0, "on": on}):
+        return False
+    _plug_rpc("Switch.GetStatus", {"id": 0})
+    return True

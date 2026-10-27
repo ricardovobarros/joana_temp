@@ -46,12 +46,33 @@ class TimerSession {
       );
 }
 
+enum FanState { off, on, unknown }
+
+class FanStatus {
+  FanStatus(this.plugOnline, this.plugOn, this.watts, this.state, this.speed);
+
+  final bool plugOnline;
+  final bool? plugOn;
+  final double? watts;
+  final FanState state;
+  final String? speed;
+
+  factory FanStatus.fromJson(Map<String, dynamic> json) => FanStatus(
+        json['plug_online'] as bool? ?? false,
+        json['plug_on'] as bool?,
+        (json['watts'] as num?)?.toDouble(),
+        FanState.values.asNameMap()[json['state']] ?? FanState.unknown,
+        json['speed'] as String?,
+      );
+}
+
 class Dashboard {
-  Dashboard(this.deviceOnline, this.readings, this.lastSession);
+  Dashboard(this.deviceOnline, this.readings, this.lastSession, this.fan);
 
   final bool? deviceOnline;
   final List<Reading> readings;
   final TimerSession? lastSession;
+  final FanStatus? fan;
 
   bool get timerRunning => lastSession?.running ?? false;
 
@@ -63,6 +84,9 @@ class Dashboard {
         json['last_session'] == null
             ? null
             : TimerSession.fromJson(json['last_session'] as Map<String, dynamic>),
+        json['fan'] == null
+            ? null
+            : FanStatus.fromJson(json['fan'] as Map<String, dynamic>),
       );
 }
 
@@ -90,6 +114,16 @@ class Api {
       _uri('/api/timer'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'action': on ? 'start' : 'stop'}),
+    );
+    if (response.statusCode != 200) _fail(response);
+  }
+
+  /// `plugOn: false` desliga o ventilador; `true` só volta a dar energia à tomada.
+  static Future<void> setFanPlug(bool plugOn) async {
+    final response = await http.post(
+      _uri('/api/fan'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'action': plugOn ? 'plug_on' : 'off'}),
     );
     if (response.statusCode != 200) _fail(response);
   }

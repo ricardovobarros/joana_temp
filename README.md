@@ -2,6 +2,8 @@
 
 Um ESP32 com um botão e um ecrã OLED funciona como timer (até 12 horas) e mede a temperatura do quarto a cada 15 minutos. Os dados vão por MQTT (EMQX Serverless) para um backend no Fly.io, que os grava no Supabase e serve um site Flutter.
 
+O site também mostra o ventilador do quarto (desligado, ligado e velocidade) e permite desligá-lo, através de uma tomada Shelly Plug M Gen3. Configuração em [VENTILADOR.md](VENTILADOR.md).
+
 ```
 ESP32 --MQTT/TLS--> EMQX Serverless <--MQTT/TLS--> Backend Python (Fly.io) --> Supabase
                                                        ^
@@ -54,6 +56,9 @@ Tópicos MQTT (prefixo `joana`):
 | `joana/timer/state` | ESP32 (retido) | `{"running": true, "elapsed_s": 0, "event": "start", "reason": "button", "ago_s": 0}` |
 | `joana/timer/cmd` | backend | `start` ou `stop` |
 | `joana/status` | ESP32 (retido) | `online` / `offline` |
+| `joana/plug/online` | Shelly | `true` / `false` |
+| `joana/plug/status/switch:0`, `joana/plug/events/rpc` | Shelly | estado da tomada e potência (`output`, `apower`) |
+| `joana/plug/rpc` | backend | pedidos RPC (`Switch.GetStatus`, `Switch.Set`); respostas em `joana-backend/rpc` |
 
 ## Passo a passo para pôr a funcionar
 
@@ -139,17 +144,18 @@ cd web && flutter build web && cd ..
 cd backend
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 set -a; source .env; set +a
-STATIC_DIR=../web/build/web .venv/bin/uvicorn main:app --reload
+MQTT_CLIENT_ID=joana-backend-local STATIC_DIR=../web/build/web .venv/bin/uvicorn main:app --reload
 ```
 
-Abre [http://localhost:8000](http://localhost:8000).
+Abre [http://localhost:8000](http://localhost:8000). O `MQTT_CLIENT_ID` diferente evita que o backend local desligue o do Fly.io do EMQX.
 
 ## API do backend
 
-O site e a API são públicos: quem tiver o URL vê os dados e pode ligar ou desligar o timer.
+O site e a API são públicos: quem tiver o URL vê os dados, pode ligar ou desligar o timer e desligar o ventilador.
 
 | Método | Caminho | Descrição |
 |---|---|---|
-| `GET` | `/api/dashboard` | leituras dos últimos 7 dias, estado do ESP32 e última sessão do timer |
+| `GET` | `/api/dashboard` | leituras dos últimos 7 dias, estado do ESP32, última sessão do timer e estado do ventilador (`fan`) |
 | `POST` | `/api/timer` | `{"action": "start"}` ou `{"action": "stop"}` |
+| `POST` | `/api/fan` | `{"action": "off"}` desliga a tomada; `{"action": "plug_on"}` volta a dar-lhe energia |
 | `GET` | `/api/health` | verificação de saúde do Fly.io |

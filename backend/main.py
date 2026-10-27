@@ -27,6 +27,10 @@ class TimerBody(BaseModel):
     action: Literal["start", "stop"]
 
 
+class FanBody(BaseModel):
+    action: Literal["off", "plug_on"]
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
@@ -47,6 +51,7 @@ def dashboard():
         ],
         "timer": {"running": running},
         "last_session": session,
+        "fan": mqtt_bridge.fan_status(),
     }
 
 
@@ -55,6 +60,15 @@ def timer(body: TimerBody):
     if mqtt_bridge.device_online is False:
         raise HTTPException(status_code=503, detail="ESP32 offline")
     if not mqtt_bridge.send_command(body.action):
+        raise HTTPException(status_code=503, detail="Servidor MQTT indisponível")
+    return {"ok": True, "action": body.action}
+
+
+@app.post("/api/fan")
+def fan(body: FanBody):
+    if not mqtt_bridge.fan_status()["plug_online"]:
+        raise HTTPException(status_code=503, detail="Tomada do ventilador offline")
+    if not mqtt_bridge.set_plug(body.action == "plug_on"):
         raise HTTPException(status_code=503, detail="Servidor MQTT indisponível")
     return {"ok": True, "action": body.action}
 
