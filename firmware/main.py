@@ -107,18 +107,38 @@ def display_text(line1, line2=None):
 def display_baby(sleeping):
     """Emoji simples, desenhado no OLED sem depender de caracteres Unicode."""
     oled.fill(0)
-    # cabeça, orelhas e olhos
-    oled.ellipse(64, 31, 23, 21, 1)
-    oled.ellipse(40, 31, 4, 7, 1)
-    oled.ellipse(88, 31, 4, 7, 1)
+    # Cabeça e orelhas. Somente primitivas presentes em versões antigas do
+    # framebuf; alguns firmwares MicroPython não oferecem ellipse().
+    oled.line(50, 11, 78, 11, 1)
+    oled.line(43, 18, 50, 11, 1)
+    oled.line(78, 11, 85, 18, 1)
+    oled.line(43, 18, 40, 31, 1)
+    oled.line(40, 31, 43, 44, 1)
+    oled.line(43, 44, 51, 51, 1)
+    oled.line(51, 51, 77, 51, 1)
+    oled.line(77, 51, 85, 44, 1)
+    oled.line(85, 44, 88, 31, 1)
+    oled.line(88, 31, 85, 18, 1)
+    oled.line(39, 25, 35, 27, 1)
+    oled.line(35, 27, 35, 36, 1)
+    oled.line(35, 36, 41, 39, 1)
+    oled.line(89, 25, 93, 27, 1)
+    oled.line(93, 27, 93, 36, 1)
+    oled.line(93, 36, 87, 39, 1)
     if sleeping:
-        oled.line(51, 29, 58, 29, 1)
-        oled.line(70, 29, 77, 29, 1)
+        oled.line(51, 29, 55, 31, 1)
+        oled.line(55, 31, 59, 29, 1)
+        oled.line(69, 29, 73, 31, 1)
+        oled.line(73, 31, 77, 29, 1)
         oled.text("zZ", 96, 4, 1)
     else:
-        oled.ellipse(55, 29, 2, 3, 1)
-        oled.ellipse(73, 29, 2, 3, 1)
-    oled.ellipse(64, 40, 5, 3, 1)
+        oled.fill_rect(53, 28, 4, 5, 1)
+        oled.fill_rect(71, 28, 4, 5, 1)
+    # Nariz e boca
+    oled.pixel(64, 36, 1)
+    oled.line(59, 42, 62, 44, 1)
+    oled.line(62, 44, 66, 44, 1)
+    oled.line(66, 44, 69, 42, 1)
     oled.show()
 
 
