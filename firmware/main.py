@@ -39,6 +39,7 @@ TOPIC_CMD = config.TOPIC_PREFIX + "/timer/cmd"
 TOPIC_STATUS = config.TOPIC_PREFIX + "/status"
 TOPIC_POWER_OVERRIDE = config.TOPIC_PREFIX + "/plug/override"
 TOPIC_SLEEP_STATE = config.TOPIC_PREFIX + "/sleep/state"
+TOPIC_SLEEP_CMD = config.TOPIC_PREFIX + "/sleep/cmd"
 
 # ===== HARDWARE =====
 i2c = I2C(0, scl=Pin(OLED_SCL), sda=Pin(OLED_SDA), freq=400000)
@@ -302,11 +303,11 @@ except ImportError:
     baby_sleeping = False
 
 
-def publish_sleep(event):
+def publish_sleep(event, reason="button"):
     queue_message(TOPIC_SLEEP_STATE, {
         "sleeping": baby_sleeping,
         "event": event,
-        "reason": "button",
+        "reason": reason,
     }, retain=True)
 
 
@@ -315,12 +316,18 @@ def sleep_click():
 
 
 def sleep_long_press():
+    set_baby_sleeping(not baby_sleeping, "button")
+
+
+def set_baby_sleeping(sleeping, reason):
     global baby_sleeping
-    baby_sleeping = not baby_sleeping
-    if _sleep_nvs is not None:
-        _sleep_nvs.set_i32("sleeping", int(baby_sleeping))
-        _sleep_nvs.commit()
-    publish_sleep("sleep" if baby_sleeping else "wake")
+    if baby_sleeping != sleeping:
+        baby_sleeping = sleeping
+        if _sleep_nvs is not None:
+            _sleep_nvs.set_i32("sleeping", int(baby_sleeping))
+            _sleep_nvs.commit()
+    # Publica também quando o estado já coincide, para reconciliar o backend.
+    publish_sleep("sleep" if baby_sleeping else "wake", reason)
     greeting = "GOOD NIGHT" if baby_sleeping else "GOOD MORNING"
     show_sequence((("text", greeting, 2000), ("baby", baby_sleeping, 2000)))
 
@@ -378,10 +385,16 @@ last_ping_ms = 0
 def on_message(topic, msg):
     command = msg.decode().strip().lower()
     print("Comando recebido:", command)
-    if command == "start":
-        start_timer("app")
-    elif command == "stop":
-        stop_timer("app")
+    if topic == TOPIC_CMD.encode():
+        if command == "start":
+            start_timer("app")
+        elif command == "stop":
+            stop_timer("app")
+    elif topic == TOPIC_SLEEP_CMD.encode():
+        if command == "sleep":
+            set_baby_sleeping(True, "app")
+        elif command == "wake":
+            set_baby_sleeping(False, "app")
 
 
 def make_client():
@@ -446,6 +459,7 @@ def ensure_network():
         client = make_client()
         client.connect()
         client.subscribe(TOPIC_CMD.encode())
+        client.subscribe(TOPIC_SLEEP_CMD.encode())
         client.publish(TOPIC_STATUS.encode(), b"online", retain=True)
         mqtt = client
         last_ping_ms = now

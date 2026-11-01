@@ -32,8 +32,9 @@ List<HourBucket> hourlyAverages(List<Reading> readings, DateTime now) {
         .where((r) => !r.at.isBefore(start) && r.at.isBefore(end))
         .map((r) => r.temperature)
         .toList();
-    final average =
-        values.isEmpty ? null : values.reduce((a, b) => a + b) / values.length;
+    final average = values.isEmpty
+        ? null
+        : values.reduce((a, b) => a + b) / values.length;
     return HourBucket(start, average);
   });
 }
@@ -42,8 +43,12 @@ List<DayBucket> dailyMinMax(List<Reading> readings, DateTime now) {
   return List.generate(7, (i) {
     final day = DateTime(now.year, now.month, now.day - (6 - i));
     final values = readings
-        .where((r) =>
-            r.at.year == day.year && r.at.month == day.month && r.at.day == day.day)
+        .where(
+          (r) =>
+              r.at.year == day.year &&
+              r.at.month == day.month &&
+              r.at.day == day.day,
+        )
         .map((r) => r.temperature)
         .toList();
     if (values.isEmpty) return DayBucket(day, null, null);
@@ -66,24 +71,24 @@ Widget _axisLabel(TitleMeta meta, String text, {bool vertical = false}) =>
     );
 
 FlTitlesData _titles(Widget Function(double, TitleMeta) bottom) => FlTitlesData(
-      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      leftTitles: AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 36,
-          getTitlesWidget: (value, meta) =>
-              _axisLabel(meta, '${value.toStringAsFixed(0)}°'),
-        ),
-      ),
-      bottomTitles: AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 48,
-          getTitlesWidget: bottom,
-        ),
-      ),
-    );
+  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+  leftTitles: AxisTitles(
+    sideTitles: SideTitles(
+      showTitles: true,
+      reservedSize: 36,
+      getTitlesWidget: (value, meta) =>
+          _axisLabel(meta, '${value.toStringAsFixed(0)}°'),
+    ),
+  ),
+  bottomTitles: AxisTitles(
+    sideTitles: SideTitles(
+      showTitles: true,
+      reservedSize: 48,
+      getTitlesWidget: bottom,
+    ),
+  ),
+);
 
 class HourlyTemperatureChart extends StatelessWidget {
   const HourlyTemperatureChart({super.key, required this.buckets});
@@ -93,8 +98,9 @@ class HourlyTemperatureChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme.primary;
-    final (low, high) =
-        _yRange(buckets.map((b) => b.average).whereType<double>());
+    final (low, high) = _yRange(
+      buckets.map((b) => b.average).whereType<double>(),
+    );
     final hourFormat = DateFormat('ha');
 
     return BarChart(
@@ -106,16 +112,20 @@ class HourlyTemperatureChart extends StatelessWidget {
         titlesData: _titles((value, meta) {
           final i = value.toInt();
           if (i % 2 != 0 || i >= buckets.length) return const SizedBox.shrink();
-          return _axisLabel(meta, hourFormat.format(buckets[i].start),
-              vertical: true);
+          return _axisLabel(
+            meta,
+            hourFormat.format(buckets[i].start),
+            vertical: true,
+          );
         }),
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(
-            getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
-              '${hourFormat.format(buckets[group.x].start)}\n'
-              '${rod.toY.toStringAsFixed(1)} °C',
-              const TextStyle(fontWeight: FontWeight.bold),
-            ),
+            getTooltipItem: (group, groupIndex, rod, rodIndex) =>
+                BarTooltipItem(
+                  '${hourFormat.format(buckets[group.x].start)}\n'
+                  '${rod.toY.toStringAsFixed(1)} °C',
+                  const TextStyle(fontWeight: FontWeight.bold),
+                ),
           ),
         ),
         barGroups: [
@@ -131,7 +141,8 @@ class HourlyTemperatureChart extends StatelessWidget {
                         color: color,
                         width: 10,
                         borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(3)),
+                          top: Radius.circular(3),
+                        ),
                       ),
                     ],
             ),
@@ -161,8 +172,11 @@ class DailyMinMaxChart extends StatelessWidget {
           final i = value.toInt();
           if (i >= buckets.length) return const SizedBox.shrink();
           final day = buckets[i].day;
-          return _axisLabel(meta, '${_weekdays[day.weekday - 1]} ${day.day}',
-              vertical: true);
+          return _axisLabel(
+            meta,
+            '${_weekdays[day.weekday - 1]} ${day.day}',
+            vertical: true,
+          );
         }),
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(
@@ -190,7 +204,10 @@ class DailyMinMaxChart extends StatelessWidget {
                         gradient: const LinearGradient(
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
-                          colors: [Colors.lightBlueAccent, Colors.deepOrangeAccent],
+                          colors: [
+                            Colors.lightBlueAccent,
+                            Colors.deepOrangeAccent,
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(4),
                       ),

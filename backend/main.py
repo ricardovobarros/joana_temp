@@ -31,6 +31,10 @@ class FanBody(BaseModel):
     action: Literal["off", "plug_on"]
 
 
+class SleepBody(BaseModel):
+    action: Literal["sleep", "wake"]
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
@@ -65,6 +69,15 @@ def sleep_dashboard():
         "last_session": latest,
         "sessions": sessions,
     }
+
+
+@app.post("/api/sleep")
+def set_sleep(body: SleepBody):
+    if mqtt_bridge.device_online is False:
+        raise HTTPException(status_code=503, detail="ESP32 offline")
+    if not mqtt_bridge.send_sleep_command(body.action):
+        raise HTTPException(status_code=503, detail="Servidor MQTT indisponível")
+    return {"ok": True, "action": body.action}
 
 
 @app.post("/api/timer")

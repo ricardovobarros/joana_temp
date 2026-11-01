@@ -164,6 +164,15 @@ class Api {
     if (response.statusCode != 200) _fail(response);
   }
 
+  static Future<void> setSleeping(bool sleeping) async {
+    final response = await http.post(
+      _uri('/api/sleep'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'action': sleeping ? 'sleep' : 'wake'}),
+    );
+    if (response.statusCode != 200) _fail(response);
+  }
+
   /// `plugOn: false` desliga o ventilador; `true` só volta a dar energia à tomada.
   static Future<void> setFanPlug(bool plugOn) async {
     final response = await http.post(

@@ -54,6 +54,7 @@ Os botões usam o pull-up interno do ESP32, não precisam de resistência.
 - Fora dessas mensagens, o OLED fica apagado e os timers continuam contando
 - Ao chegar às **12:00** o timer desliga sozinho
 - O site pode **ativar ou desativar** o timer à distância
+- O site pode **registar que o bebé dormiu ou acordou** à distância
 - A temperatura é lida a cada **15 minutos**; sem internet, as leituras e eventos ficam em fila (até 20) e são enviados quando a ligação voltar
 
 Tópicos MQTT (prefixo `joana`):
@@ -65,6 +66,7 @@ Tópicos MQTT (prefixo `joana`):
 | `joana/timer/cmd` | backend | `start` ou `stop` |
 | `joana/status` | ESP32 (retido) | `online` / `offline` |
 | `joana/sleep/state` | ESP32 (retido) | estado e evento de sono/acordar |
+| `joana/sleep/cmd` | backend | `sleep` ou `wake` |
 | `joana/plug/override` | ESP32 | pedido para restaurar a energia da tomada |
 | `joana/plug/online` | Shelly | `true` / `false` |
 | `joana/plug/status/switch:0`, `joana/plug/events/rpc` | Shelly | estado da tomada e potência (`output`, `apower`) |
@@ -167,6 +169,7 @@ O site e a API são públicos: quem tiver o URL vê os dados, pode ligar ou desl
 |---|---|---|
 | `GET` | `/api/dashboard` | leituras dos últimos 7 dias, estado do ESP32, última sessão do timer e estado do ventilador (`fan`) |
 | `GET` | `/api/sleep` | períodos e estado atual do sono do bebé |
+| `POST` | `/api/sleep` | `{"action": "sleep"}` ou `{"action": "wake"}` |
 | `POST` | `/api/timer` | `{"action": "start"}` ou `{"action": "stop"}` |
 | `POST` | `/api/fan` | `{"action": "off"}` desliga a tomada; `{"action": "plug_on"}` volta a dar-lhe energia |
 | `GET` | `/api/health` | verificação de saúde do Fly.io |

@@ -3,13 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'app_section_switch.dart';
 import 'charts.dart';
 import 'fan_card.dart';
 import 'timer_card.dart';
-import 'sleep_page.dart';
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  const DashboardPage({super.key, required this.onSectionSelected});
+
+  final ValueChanged<AppSection> onSectionSelected;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -99,15 +101,12 @@ class _DashboardPageState extends State<DashboardPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quarto Jojo'),
+        bottom: AppSectionTabs(
+          selected: AppSection.temperature,
+          onSelected: widget.onSectionSelected,
+        ),
         actions: [
           if (data != null) _DeviceStatus(online: data.deviceOnline),
-          IconButton(
-            tooltip: 'Sono do bebé',
-            icon: const Icon(Icons.bedtime),
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const SleepPage())),
-          ),
           IconButton(
             tooltip: 'Atualizar',
             icon: const Icon(Icons.refresh),

@@ -35,11 +35,13 @@ class TimerCard extends StatelessWidget {
     Duration duration = Duration.zero;
     if (session != null) {
       final started = session!.startedAt;
-      final sameDay = started.year == now.year &&
+      final sameDay =
+          started.year == now.year &&
           started.month == now.month &&
           started.day == now.day;
-      lastActivation =
-          DateFormat(sameDay ? 'h:mm a' : 'd/M h:mm a').format(started);
+      lastActivation = DateFormat(
+        sameDay ? 'h:mm a' : 'd/M h:mm a',
+      ).format(started);
       duration = running
           ? now.difference(started)
           : Duration(seconds: session!.durationSeconds ?? 0);

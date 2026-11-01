@@ -6,12 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'api.dart';
+import 'app_section_switch.dart';
 
 const _dayStartHour = 18;
 const _weekdays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 class SleepPage extends StatefulWidget {
-  const SleepPage({super.key});
+  const SleepPage({super.key, required this.onSectionSelected});
+
+  final ValueChanged<AppSection> onSectionSelected;
 
   @override
   State<SleepPage> createState() => _SleepPageState();
@@ -20,6 +23,7 @@ class SleepPage extends StatefulWidget {
 class _SleepPageState extends State<SleepPage> {
   SleepDashboard? _data;
   String? _error;
+  bool _busy = false;
   DateTime _now = DateTime.now();
   Timer? _refreshTimer;
   Timer? _clockTimer;
@@ -57,12 +61,34 @@ class _SleepPageState extends State<SleepPage> {
     }
   }
 
+  Future<void> _setSleeping(bool sleeping) async {
+    setState(() => _busy = true);
+    try {
+      await Api.setSleeping(sleeping);
+      // Aguarda o ESP32 publicar o estado confirmado pelo botão ou pelo site.
+      await Future.delayed(const Duration(seconds: 2));
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Falhou: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = _data;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sono do bebé'),
+        bottom: AppSectionTabs(
+          selected: AppSection.sleep,
+          onSelected: widget.onSectionSelected,
+        ),
         actions: [
           IconButton(
             tooltip: 'Atualizar',
@@ -101,7 +127,12 @@ class _SleepPageState extends State<SleepPage> {
             ),
           LayoutBuilder(
             builder: (context, constraints) {
-              final status = _StatusCard(data: data, now: _now);
+              final status = _StatusCard(
+                data: data,
+                now: _now,
+                busy: _busy,
+                onSetSleeping: _setSleeping,
+              );
               final totalCard = _TotalCard(total: total, since: boundary);
               return constraints.maxWidth >= 650
                   ? IntrinsicHeight(
@@ -145,9 +176,16 @@ class _SleepPageState extends State<SleepPage> {
 }
 
 class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.data, required this.now});
+  const _StatusCard({
+    required this.data,
+    required this.now,
+    required this.busy,
+    required this.onSetSleeping,
+  });
   final SleepDashboard data;
   final DateTime now;
+  final bool busy;
+  final ValueChanged<bool> onSetSleeping;
 
   @override
   Widget build(BuildContext context) {
@@ -184,7 +222,20 @@ class _StatusCard extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: busy ? null : () => onSetSleeping(!data.sleeping),
+              icon: busy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(data.sleeping ? Icons.wb_sunny : Icons.bedtime),
+              label: Text(
+                data.sleeping ? 'Acordar bebé' : 'Colocar bebé para dormir',
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(lastLabel, textAlign: TextAlign.center),
           ],
         ),

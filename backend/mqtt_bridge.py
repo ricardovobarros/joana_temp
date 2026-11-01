@@ -19,6 +19,7 @@ TOPIC_CMD = f"{settings.TOPIC_PREFIX}/timer/cmd"
 TOPIC_STATUS = f"{settings.TOPIC_PREFIX}/status"
 TOPIC_POWER_OVERRIDE = f"{settings.TOPIC_PREFIX}/plug/override"
 TOPIC_SLEEP_STATE = f"{settings.TOPIC_PREFIX}/sleep/state"
+TOPIC_SLEEP_CMD = f"{settings.TOPIC_PREFIX}/sleep/cmd"
 
 # Shelly Plug M Gen3 (API Gen2+). As respostas RPC chegam em "<src>/rpc".
 TOPIC_PLUG_ONLINE = f"{settings.PLUG_TOPIC_PREFIX}/online"
@@ -224,6 +225,13 @@ def send_command(action: str) -> bool:
     if _client is None or not _client.is_connected():
         return False
     info = _client.publish(TOPIC_CMD, action, qos=1, retain=False)
+    return info.rc == mqtt.MQTT_ERR_SUCCESS
+
+
+def send_sleep_command(action: str) -> bool:
+    if _client is None or not _client.is_connected():
+        return False
+    info = _client.publish(TOPIC_SLEEP_CMD, action, qos=1, retain=False)
     return info.rc == mqtt.MQTT_ERR_SUCCESS
 
 

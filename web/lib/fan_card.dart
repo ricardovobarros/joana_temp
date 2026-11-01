@@ -55,8 +55,10 @@ class FanCard extends StatelessWidget {
             Text(
               headline,
               textAlign: TextAlign.center,
-              style: theme.textTheme.displaySmall
-                  ?.copyWith(fontWeight: FontWeight.w600, color: color),
+              style: theme.textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
             const SizedBox(height: 8),
             Text(

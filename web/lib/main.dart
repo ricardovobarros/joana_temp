@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'dashboard_page.dart';
+import 'home_page.dart';
 
 void main() {
   runApp(const JoanaApp());
@@ -21,7 +21,7 @@ class JoanaApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const DashboardPage(),
+      home: const HomePage(),
     );
   }
 }
