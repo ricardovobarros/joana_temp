@@ -25,7 +25,7 @@ ESP32 --MQTT/TLS--> EMQX Serverless <--MQTT/TLS--> Backend Python (Fly.io) --> S
 - ESP32 Dev Module, alimentado por USB
 - OLED SSD1306 128x64 I2C
 - DHT11
-- Botão de pressão (2 pinos)
+- 3 botões de pressão (2 pinos cada)
 
 ```
 ESP32          Componente
@@ -35,15 +35,23 @@ GND      →     OLED GND, DHT GND, botão (um pino)
 GPIO 21  →     OLED SDA
 GPIO 22  →     OLED SCL
 GPIO 4   →     DHT DATA
-GPIO 14  →     botão (outro pino)
+GPIO 14  →     botão do timer (outro pino)
+GPIO 27  →     botão de override da energia (outro pino)
+GPIO 13  →     botão de sono do bebé (outro pino)
 ```
 
-O botão usa o pull-up interno do ESP32, não precisa de resistência.
+Os botões usam o pull-up interno do ESP32, não precisam de resistência.
 
 ## Funcionamento
 
-- **Clique curto** com o timer desligado: o timer arranca e o OLED mostra `HH:MM`
-- **Segurar o botão 2 segundos**: o timer desliga e o ecrã apaga
+- **GPIO 14, clique curto:** mostra o tempo por 3 segundos
+- **GPIO 14, segurar 2 segundos:** alterna o timer; mostra `ON`/`OFF` por
+  1,5 segundo e `00:01`/`00:00` por mais 1,5 segundo
+- **GPIO 27, clique curto:** restaura a energia da tomada se estiver cortada
+- **GPIO 13, clique curto:** mostra se o bebé está dormindo ou acordado
+- **GPIO 13, segurar 2 segundos:** registra que dormiu/acordou e mostra a
+  saudação e o emoji por 2 segundos cada
+- Fora dessas mensagens, o OLED fica apagado e os timers continuam contando
 - Ao chegar às **12:00** o timer desliga sozinho
 - O site pode **ativar ou desativar** o timer à distância
 - A temperatura é lida a cada **15 minutos**; sem internet, as leituras e eventos ficam em fila (até 20) e são enviados quando a ligação voltar
@@ -56,6 +64,8 @@ Tópicos MQTT (prefixo `joana`):
 | `joana/timer/state` | ESP32 (retido) | `{"running": true, "elapsed_s": 0, "event": "start", "reason": "button", "ago_s": 0}` |
 | `joana/timer/cmd` | backend | `start` ou `stop` |
 | `joana/status` | ESP32 (retido) | `online` / `offline` |
+| `joana/sleep/state` | ESP32 (retido) | estado e evento de sono/acordar |
+| `joana/plug/override` | ESP32 | pedido para restaurar a energia da tomada |
 | `joana/plug/online` | Shelly | `true` / `false` |
 | `joana/plug/status/switch:0`, `joana/plug/events/rpc` | Shelly | estado da tomada e potência (`output`, `apower`) |
 | `joana/plug/rpc` | backend | pedidos RPC (`Switch.GetStatus`, `Switch.Set`); respostas em `joana-backend/rpc` |
@@ -156,6 +166,7 @@ O site e a API são públicos: quem tiver o URL vê os dados, pode ligar ou desl
 | Método | Caminho | Descrição |
 |---|---|---|
 | `GET` | `/api/dashboard` | leituras dos últimos 7 dias, estado do ESP32, última sessão do timer e estado do ventilador (`fan`) |
+| `GET` | `/api/sleep` | períodos e estado atual do sono do bebé |
 | `POST` | `/api/timer` | `{"action": "start"}` ou `{"action": "stop"}` |
 | `POST` | `/api/fan` | `{"action": "off"}` desliga a tomada; `{"action": "plug_on"}` volta a dar-lhe energia |
 | `GET` | `/api/health` | verificação de saúde do Fly.io |

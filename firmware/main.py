@@ -14,7 +14,9 @@ except ImportError:
     print("umqtt.simple em falta: corre 'mpremote mip install umqtt.simple'")
 
 # ===== PINOS =====
-BUTTON_PIN = 14   # Botão entre GPIO 14 e GND
+TIMER_BUTTON_PIN = 14  # Botão do timer entre GPIO 14 e GND
+POWER_BUTTON_PIN = 27  # Override da energia da tomada
+SLEEP_BUTTON_PIN = 13  # Registo de sono do bebé
 DHT_PIN = 4       # DHT11 DATA
 OLED_SDA = 21
 OLED_SCL = 22
@@ -35,11 +37,15 @@ TOPIC_TEMP = config.TOPIC_PREFIX + "/temp"
 TOPIC_STATE = config.TOPIC_PREFIX + "/timer/state"
 TOPIC_CMD = config.TOPIC_PREFIX + "/timer/cmd"
 TOPIC_STATUS = config.TOPIC_PREFIX + "/status"
+TOPIC_POWER_OVERRIDE = config.TOPIC_PREFIX + "/plug/override"
+TOPIC_SLEEP_STATE = config.TOPIC_PREFIX + "/sleep/state"
 
 # ===== HARDWARE =====
 i2c = I2C(0, scl=Pin(OLED_SCL), sda=Pin(OLED_SDA), freq=400000)
 oled = SSD1306_I2C(128, 64, i2c)
-button = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
+timer_button = Pin(TIMER_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
+power_button = Pin(POWER_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
+sleep_button = Pin(SLEEP_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 dht_sensor = dht.DHT11(Pin(DHT_PIN, Pin.IN, Pin.PULL_UP))
 wlan = network.WLAN(network.STA_IF)
 
@@ -88,6 +94,72 @@ def display_timer(elapsed_s, colon_on):
     oled.show()
 
 
+def display_text(line1, line2=None):
+    """Texto centralizado. O driver nativo usa uma fonte legível de 8 px."""
+    oled.fill(0)
+    y = 22 if line2 is None else 16
+    oled.text(line1, max(0, (128 - len(line1) * 8) // 2), y, 1)
+    if line2 is not None:
+        oled.text(line2, max(0, (128 - len(line2) * 8) // 2), y + 18, 1)
+    oled.show()
+
+
+def display_baby(sleeping):
+    """Emoji simples, desenhado no OLED sem depender de caracteres Unicode."""
+    oled.fill(0)
+    # cabeça, orelhas e olhos
+    oled.ellipse(64, 31, 23, 21, 1)
+    oled.ellipse(40, 31, 4, 7, 1)
+    oled.ellipse(88, 31, 4, 7, 1)
+    if sleeping:
+        oled.line(51, 29, 58, 29, 1)
+        oled.line(70, 29, 77, 29, 1)
+        oled.text("zZ", 96, 4, 1)
+    else:
+        oled.ellipse(55, 29, 2, 3, 1)
+        oled.ellipse(73, 29, 2, 3, 1)
+    oled.ellipse(64, 40, 5, 3, 1)
+    oled.show()
+
+
+# A tela é controlada por etapas não bloqueantes para não interromper MQTT/DHT.
+display_steps = []
+display_step_started_ms = 0
+
+
+def _draw_display_step(kind, value=None):
+    if kind == "timer":
+        display_timer(value, True)
+    elif kind == "baby":
+        display_baby(value)
+    else:
+        display_text(value)
+
+
+def show_sequence(steps):
+    global display_steps, display_step_started_ms
+    display_steps = list(steps)
+    display_step_started_ms = time.ticks_ms()
+    kind, value, _duration = display_steps[0]
+    _draw_display_step(kind, value)
+
+
+def poll_display():
+    global display_steps, display_step_started_ms
+    if not display_steps:
+        return
+    now = time.ticks_ms()
+    if time.ticks_diff(now, display_step_started_ms) < display_steps[0][2]:
+        return
+    display_steps.pop(0)
+    if not display_steps:
+        clear_display()
+        return
+    display_step_started_ms = now
+    kind, value, _duration = display_steps[0]
+    _draw_display_step(kind, value)
+
+
 # ===== FILA DE MENSAGENS (para quando não há rede) =====
 pending = []
 
@@ -128,6 +200,7 @@ def start_timer(reason):
     last_drawn = None
     print("Timer ligado ({})".format(reason))
     publish_state("start", reason, 0)
+    show_sequence((("text", "ON", 1500), ("timer", 1, 1500)))
 
 
 def stop_timer(reason):
@@ -137,49 +210,111 @@ def stop_timer(reason):
     elapsed = min(timer_elapsed_s(), TIMER_MAX_S)
     timer_running = False
     last_drawn = None
-    clear_display()
     print("Timer desligado ({}) após {} s".format(reason, elapsed))
     publish_state("stop", reason, elapsed)
+    show_sequence((("text", "OFF", 1500), ("timer", 0, 1500)))
 
 
-def update_timer_display():
-    global last_drawn
+def update_timer():
     if not timer_running:
         return
     elapsed = timer_elapsed_s()
     if elapsed >= TIMER_MAX_S:
         stop_timer("auto12h")
         return
-    frame = (elapsed // 60, elapsed % 2 == 0)
-    if frame != last_drawn:
-        display_timer(elapsed, frame[1])
-        last_drawn = frame
+    # O timer continua em segundo plano; o OLED só acende sob comando.
 
 
-# ===== BOTÃO =====
-button_down = False
-button_down_ms = 0
-long_handled = False
+# ===== BOTÕES =====
+class Button:
+    def __init__(self, pin, on_click, on_long=None):
+        self.pin = pin
+        self.on_click = on_click
+        self.on_long = on_long
+        self.down = False
+        self.down_ms = 0
+        self.long_handled = False
+
+    def poll(self):
+        pressed = self.pin.value() == 0
+        now = time.ticks_ms()
+        if pressed and not self.down:
+            self.down = True
+            self.down_ms = now
+            self.long_handled = False
+        elif pressed and self.down and self.on_long is not None:
+            if (not self.long_handled and
+                    time.ticks_diff(now, self.down_ms) >= LONG_PRESS_MS):
+                self.long_handled = True
+                self.on_long()
+        elif not pressed and self.down:
+            self.down = False
+            held = time.ticks_diff(now, self.down_ms)
+            if not self.long_handled and DEBOUNCE_MS <= held < LONG_PRESS_MS:
+                self.on_click()
 
 
-def poll_button():
-    global button_down, button_down_ms, long_handled
-    pressed = button.value() == 0
-    now = time.ticks_ms()
+def timer_click():
+    show_sequence((("timer", min(timer_elapsed_s(), TIMER_MAX_S), 3000),))
 
-    if pressed and not button_down:
-        button_down = True
-        button_down_ms = now
-        long_handled = False
-    elif pressed and button_down:
-        if not long_handled and time.ticks_diff(now, button_down_ms) >= LONG_PRESS_MS:
-            long_handled = True
-            stop_timer("button")
-    elif not pressed and button_down:
-        button_down = False
-        held = time.ticks_diff(now, button_down_ms)
-        if not long_handled and DEBOUNCE_MS <= held < LONG_PRESS_MS:
-            start_timer("button")
+
+def timer_long_press():
+    if timer_running:
+        stop_timer("button")
+    else:
+        start_timer("button")
+
+
+def power_override_click():
+    queue_message(TOPIC_POWER_OVERRIDE, {"event": "ensure_on"})
+    show_sequence((("text", "POWER ON", 3000),))
+
+
+try:
+    import esp32
+    _sleep_nvs = esp32.NVS("joana")
+    try:
+        baby_sleeping = bool(_sleep_nvs.get_i32("sleeping"))
+    except OSError:
+        baby_sleeping = False
+except ImportError:
+    _sleep_nvs = None
+    baby_sleeping = False
+
+
+def publish_sleep(event):
+    queue_message(TOPIC_SLEEP_STATE, {
+        "sleeping": baby_sleeping,
+        "event": event,
+        "reason": "button",
+    }, retain=True)
+
+
+def sleep_click():
+    show_sequence((("baby", baby_sleeping, 3000),))
+
+
+def sleep_long_press():
+    global baby_sleeping
+    baby_sleeping = not baby_sleeping
+    if _sleep_nvs is not None:
+        _sleep_nvs.set_i32("sleeping", int(baby_sleeping))
+        _sleep_nvs.commit()
+    publish_sleep("sleep" if baby_sleeping else "wake")
+    greeting = "GOOD NIGHT" if baby_sleeping else "GOOD MORNING"
+    show_sequence((("text", greeting, 2000), ("baby", baby_sleeping, 2000)))
+
+
+buttons = (
+    Button(timer_button, timer_click, timer_long_press),
+    Button(power_button, power_override_click),
+    Button(sleep_button, sleep_click, sleep_long_press),
+)
+
+
+def poll_buttons():
+    for item in buttons:
+        item.poll()
 
 
 # ===== TEMPERATURA =====
@@ -295,6 +430,7 @@ def ensure_network():
         mqtt = client
         last_ping_ms = now
         publish_state("sync", "reconnect", timer_elapsed_s())
+        publish_sleep("sync")
         print("MQTT ligado")
     except Exception as e:
         print("Falha MQTT:", e)
@@ -326,8 +462,9 @@ clear_display()
 print("Sistema iniciado")
 
 while True:
-    poll_button()
-    update_timer_display()
+    poll_buttons()
+    update_timer()
+    poll_display()
     poll_temperature()
     ensure_network()
     poll_mqtt()

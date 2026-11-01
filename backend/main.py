@@ -55,6 +55,18 @@ def dashboard():
     }
 
 
+@app.get("/api/sleep")
+def sleep_dashboard():
+    sessions = db.sleep_sessions_since(db.days_ago(8))
+    latest = db.latest_sleep_session()
+    return {
+        "server_time": db.now_utc().isoformat(),
+        "sleeping": latest is not None and latest["ended_at"] is None,
+        "last_session": latest,
+        "sessions": sessions,
+    }
+
+
 @app.post("/api/timer")
 def timer(body: TimerBody):
     if mqtt_bridge.device_online is False:

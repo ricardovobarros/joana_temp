@@ -6,6 +6,7 @@ import 'api.dart';
 import 'charts.dart';
 import 'fan_card.dart';
 import 'timer_card.dart';
+import 'sleep_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -27,10 +28,11 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _load();
-    _refreshTimer =
-        Timer.periodic(const Duration(seconds: 30), (_) => _load());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _load());
     _clockTimer = Timer.periodic(
-        const Duration(seconds: 10), (_) => setState(() => _now = DateTime.now()));
+      const Duration(seconds: 10),
+      (_) => setState(() => _now = DateTime.now()),
+    );
   }
 
   @override
@@ -65,8 +67,9 @@ class _DashboardPageState extends State<DashboardPage> {
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Falhou: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Falhou: $e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -81,8 +84,9 @@ class _DashboardPageState extends State<DashboardPage> {
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Falhou: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Falhou: $e')));
       }
     } finally {
       if (mounted) setState(() => _fanBusy = false);
@@ -97,6 +101,13 @@ class _DashboardPageState extends State<DashboardPage> {
         title: const Text('Quarto Jojo'),
         actions: [
           if (data != null) _DeviceStatus(online: data.deviceOnline),
+          IconButton(
+            tooltip: 'Sono do bebé',
+            icon: const Icon(Icons.bedtime),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SleepPage())),
+          ),
           IconButton(
             tooltip: 'Atualizar',
             icon: const Icon(Icons.refresh),
@@ -132,7 +143,8 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'Temperatura - últimas 24 horas',
           subtitle: _latestReadingText(data),
           child: HourlyTemperatureChart(
-              buckets: hourlyAverages(data.readings, _now)),
+            buckets: hourlyAverages(data.readings, _now),
+          ),
         ),
         const SizedBox(height: 16),
         _ChartCard(
@@ -142,54 +154,61 @@ class _DashboardPageState extends State<DashboardPage> {
       ],
     );
 
-    return LayoutBuilder(builder: (context, constraints) {
-      final wide = constraints.maxWidth >= 900;
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              ),
-            if (wide)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: charts),
-                  const SizedBox(width: 16),
-                  SizedBox(
-                    width: 300,
-                    child: Column(
-                      children: [
-                        timerCard,
-                        const SizedBox(height: 16),
-                        fanCard,
-                      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 900;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
                     ),
                   ),
-                ],
-              )
-            else ...[
-              timerCard,
-              const SizedBox(height: 16),
-              fanCard,
-              const SizedBox(height: 16),
-              charts,
+                ),
+              if (wide)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: charts),
+                    const SizedBox(width: 16),
+                    SizedBox(
+                      width: 300,
+                      child: Column(
+                        children: [
+                          timerCard,
+                          const SizedBox(height: 16),
+                          fanCard,
+                        ],
+                      ),
+                    ),
+                  ],
+                )
+              else ...[
+                timerCard,
+                const SizedBox(height: 16),
+                fanCard,
+                const SizedBox(height: 16),
+                charts,
+              ],
             ],
-          ],
-        ),
-      );
-    });
+          ),
+        );
+      },
+    );
   }
 
   String? _latestReadingText(Dashboard data) {
     if (data.readings.isEmpty) return 'Ainda sem leituras';
     final last = data.readings.last;
-    final humidity =
-        last.humidity == null ? '' : ' · ${last.humidity!.toStringAsFixed(0)}% hum.';
+    final humidity = last.humidity == null
+        ? ''
+        : ' · ${last.humidity!.toStringAsFixed(0)}% hum.';
     return 'Agora: ${last.temperature.toStringAsFixed(1)} °C$humidity';
   }
 }

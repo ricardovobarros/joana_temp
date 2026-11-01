@@ -17,6 +17,8 @@ TOPIC_TEMP = f"{settings.TOPIC_PREFIX}/temp"
 TOPIC_STATE = f"{settings.TOPIC_PREFIX}/timer/state"
 TOPIC_CMD = f"{settings.TOPIC_PREFIX}/timer/cmd"
 TOPIC_STATUS = f"{settings.TOPIC_PREFIX}/status"
+TOPIC_POWER_OVERRIDE = f"{settings.TOPIC_PREFIX}/plug/override"
+TOPIC_SLEEP_STATE = f"{settings.TOPIC_PREFIX}/sleep/state"
 
 # Shelly Plug M Gen3 (API Gen2+). As respostas RPC chegam em "<src>/rpc".
 TOPIC_PLUG_ONLINE = f"{settings.PLUG_TOPIC_PREFIX}/online"
@@ -87,6 +89,28 @@ def _handle_state(payload: dict, retained: bool):
     log.info("Timer %s (%s)", event, payload.get("reason"))
 
 
+def _handle_sleep(payload: dict, retained: bool):
+    event = payload.get("event")
+    sleeping = bool(payload.get("sleeping"))
+    event_at = db.now_utc() - timedelta(seconds=int(payload.get("ago_s", 0)))
+    session = db.open_sleep_session()
+
+    # Mensagem retida/sync reconcilia o estado após uma reinicialização sem
+    # duplicar um toque que o backend já tenha gravado.
+    if retained or event == "sync":
+        if sleeping and session is None:
+            db.start_sleep_session(event_at)
+        elif not sleeping and session is not None:
+            db.close_sleep_session(session, event_at, "reboot")
+        return
+
+    if event == "sleep" and session is None:
+        db.start_sleep_session(event_at)
+    elif event == "wake" and session is not None:
+        db.close_sleep_session(session, event_at, payload.get("reason", "button"))
+    log.info("Bebé: %s", "dormiu" if sleeping else "acordou")
+
+
 def _update_plug(status: dict):
     with _plug_lock:
         if "output" in status:
@@ -139,6 +163,7 @@ def _on_connect(client, userdata, flags, reason_code, properties):
     log.info("Ligado ao MQTT %s", settings.MQTT_HOST)
     client.subscribe([
         (TOPIC_TEMP, 1), (TOPIC_STATE, 1), (TOPIC_STATUS, 1),
+        (TOPIC_POWER_OVERRIDE, 1), (TOPIC_SLEEP_STATE, 1),
         (TOPIC_PLUG_ONLINE, 1), (TOPIC_PLUG_STATUS, 1),
         (TOPIC_PLUG_EVENTS, 1), (TOPIC_PLUG_REPLIES, 1),
     ])
@@ -152,6 +177,11 @@ def _on_message(client, userdata, msg):
         if msg.topic == TOPIC_STATUS:
             device_online = text == "online"
             return
+        if msg.topic == TOPIC_POWER_OVERRIDE:
+            # O botão físico apenas restaura energia; nunca a corta.
+            if set_plug(True):
+                log.info("Override físico: energia da tomada ligada")
+            return
         if msg.topic in (TOPIC_PLUG_ONLINE, TOPIC_PLUG_STATUS,
                          TOPIC_PLUG_EVENTS, TOPIC_PLUG_REPLIES):
             _handle_plug(msg.topic, text)
@@ -163,6 +193,8 @@ def _on_message(client, userdata, msg):
                     _handle_temp(payload)
             elif msg.topic == TOPIC_STATE:
                 _handle_state(payload, msg.retain)
+            elif msg.topic == TOPIC_SLEEP_STATE:
+                _handle_sleep(payload, msg.retain)
     except Exception:
         log.exception("Erro a processar %s: %r", msg.topic, msg.payload)
 

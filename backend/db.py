@@ -64,6 +64,51 @@ def latest_session():
     return rows[0] if rows else None
 
 
+def sleep_sessions_since(since: datetime):
+    """Períodos de sono para o gráfico (inclui margem para cruzar o limite)."""
+    return _request("GET", "sleep_sessions", params={
+        "select": "*",
+        "started_at": f"gte.{(since - timedelta(days=1)).isoformat()}",
+        "order": "started_at.asc",
+        "limit": "500",
+    })
+
+
+def open_sleep_session():
+    rows = _request("GET", "sleep_sessions", params={
+        "select": "*",
+        "ended_at": "is.null",
+        "limit": "1",
+    })
+    return rows[0] if rows else None
+
+
+def latest_sleep_session():
+    rows = _request("GET", "sleep_sessions", params={
+        "select": "*",
+        "order": "started_at.desc",
+        "limit": "1",
+    })
+    return rows[0] if rows else None
+
+
+def start_sleep_session(started_at: datetime):
+    _request("POST", "sleep_sessions", prefer="return=minimal", json={
+        "started_at": started_at.isoformat(),
+    })
+
+
+def close_sleep_session(session: dict, ended_at: datetime, reason="button"):
+    started_at = parse_ts(session["started_at"])
+    duration_seconds = max(0, int((ended_at - started_at).total_seconds()))
+    _request("PATCH", "sleep_sessions", params={"id": f"eq.{session['id']}"},
+             prefer="return=minimal", json={
+                 "ended_at": ended_at.isoformat(),
+                 "duration_seconds": duration_seconds,
+                 "end_reason": reason,
+             })
+
+
 def start_session(started_at: datetime):
     _request("POST", "timer_sessions", prefer="return=minimal", json={
         "started_at": started_at.isoformat(),

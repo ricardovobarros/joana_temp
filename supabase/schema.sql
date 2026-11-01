@@ -43,3 +43,19 @@ order by 1 desc;
 -- O backend usa a service role key, que ignora o RLS.
 alter table public.temperature_readings enable row level security;
 alter table public.timer_sessions enable row level security;
+
+create table if not exists public.sleep_sessions (
+    id bigint generated always as identity primary key,
+    started_at timestamptz not null,
+    ended_at timestamptz,
+    duration_seconds integer,
+    end_reason text check (end_reason in ('button', 'reboot', 'unknown'))
+);
+
+create index if not exists sleep_sessions_started_at_idx
+    on public.sleep_sessions (started_at desc);
+
+create unique index if not exists sleep_sessions_one_open_idx
+    on public.sleep_sessions ((true)) where ended_at is null;
+
+alter table public.sleep_sessions enable row level security;
