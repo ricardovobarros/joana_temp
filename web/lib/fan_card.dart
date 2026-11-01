@@ -31,14 +31,16 @@ class FanCard extends StatelessWidget {
       color = theme.disabledColor;
     } else if (plugOff) {
       headline = 'Desligado';
-      detail = 'Tomada sem energia';
+      detail = 'Sem energia até às 8:00';
     } else if (running) {
       headline = fan.speed ?? 'Ligado';
       detail = fan.speed == null ? 'Velocidade desconhecida' : 'Ligado';
       color = theme.colorScheme.primary;
     } else {
       headline = 'Desligado';
-      detail = fan.state == FanState.unknown ? 'A aguardar leitura' : 'Em espera';
+      detail = fan.state == FanState.unknown
+          ? 'A aguardar leitura'
+          : 'Tomada com energia. O ventilador liga no botão dele';
     }
     final watts = fan?.watts;
 
@@ -65,28 +67,44 @@ class FanCard extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
-            if (plugOff)
-              OutlinedButton.icon(
-                onPressed: busy ? null : () => onSetPlug(true),
-                icon: const Icon(Icons.power),
-                label: const Text('Religar tomada'),
-              )
-            else
-              FilledButton.icon(
-                onPressed: busy || !running ? null : () => onSetPlug(false),
-                style: FilledButton.styleFrom(
-                  backgroundColor: theme.colorScheme.error,
-                  foregroundColor: theme.colorScheme.onError,
-                ),
-                icon: busy
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.power_settings_new),
-                label: const Text('Desligar ventilador'),
+            FilledButton.icon(
+              onPressed: busy || !online
+                  ? null
+                  : () {
+                      if (!running && !plugOff) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'A tomada já tem energia. O ventilador só arranca no botão dele.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      onSetPlug(!running);
+                    },
+              style: running
+                  ? FilledButton.styleFrom(
+                      backgroundColor: theme.colorScheme.error,
+                      foregroundColor: theme.colorScheme.onError,
+                    )
+                  : null,
+              icon: busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(running ? Icons.power_settings_new : Icons.power),
+              label: Text(running ? 'Desligar ventilador' : 'Ligar energia'),
+            ),
+            if (online && !plugOff && !running) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: busy ? null : () => onSetPlug(false),
+                child: const Text('Cortar energia'),
               ),
+            ],
           ],
         ),
       ),

@@ -10,9 +10,10 @@ O que o site mostra:
 | Tomada com energia, ventilador em espera | **Desligado** (Em espera) |
 | Watts dentro de uma faixa | **V1**, **V2**, ... (Ligado) |
 | Watts fora de todas as faixas | **Ligado** (Velocidade desconhecida) |
-| Tomada cortada | **Desligado** (Tomada sem energia), com o botão "Religar tomada" |
+| Tomada cortada | **Desligado** (Sem energia até às 8:00). O botão diz "Ligar energia" |
+| Tomada com energia e ventilador parado | **Desligado**. O botão diz "Ligar energia"; "Cortar energia" tira a corrente |
 
-O botão **"Desligar ventilador"** corta a energia da tomada. Como o ventilador arranca sempre desligado, ligá-lo outra vez só dá no botão do próprio ventilador.
+O botão **"Desligar ventilador"** corta a energia e deixa a tomada desligada. A energia volta às **8:00** (hora da Alemanha) ou nesse mesmo botão, que passa a **Ligar energia**. O ventilador em si continua a ligar-se só no botão dele.
 
 O código já está pronto. Falta configurar a tomada, medir as potências, preencher as faixas e publicar.
 
@@ -55,12 +56,15 @@ Na página web da tomada, abre **Settings → MQTT**. O nome exato do menu pode 
 
 Guarda. A tomada reinicia. Para confirmar, na consola do EMQX, em **Monitoring → Clients**, tem de aparecer o `joana-plug`.
 
-## Passo 4: Auto ON e arranque ligado
+## Passo 4: energia só às 8:00 ou pelo botão
 
-Ainda na página web da tomada, na configuração da saída (Output / Switch):
+Na saída da tomada (Output / Switch):
 
-1. **Auto ON**: ligado, com **5 segundos**. Quando carregas em "Desligar ventilador" no site, a tomada corta a energia e volta a ligá-la 5 segundos depois. O ventilador fica desligado, mas pronto para ser ligado no botão dele.
-2. **Power on default / Estado após falha de energia**: **ON**. Depois de uma falha de luz, a tomada volta a dar energia.
+1. **Auto ON**: desligado. A tomada não volta a dar energia sozinha depois de desligar.
+2. **Estado após falha de energia**: **OFF**. Uma falha de luz não liga o relé outra vez.
+3. Um agendamento diário às **8:00**, fuso **Europe/Berlin**, executa `Switch.Set` com `on: true`.
+
+O botão do site também liga a energia na hora, sem esperar pelas 8:00.
 
 ## Passo 5: medir a potência de cada velocidade
 
@@ -74,9 +78,14 @@ A página web da tomada mostra a potência em tempo real, em watts.
 | Velocidade | Mínimo medido (W) | Máximo medido (W) |
 |---|---|---|
 | Em espera | | |
-| V1 | | |
-| V2 | | |
-| V3 | | |
+| V1 | 3.3 | 3.3 |
+| V2 | 6.8 | 6.8 |
+| V3 | 8.2 | 8.2 |
+| V4 | 9.3 | 9.3 |
+| V5 | 11.3 | 11.3 |
+| V6 | 13.8 | 13.8 |
+| V7 | 15.4 | 15.4 |
+| V8 | acima de 16.2 | |
 
 ## Passo 6: preencher as faixas
 
@@ -84,10 +93,15 @@ Abre **`backend/fan_speeds.py`**. É o único sítio a mudar:
 
 ```python
 FAN_SPEEDS = [
-    # (nome,  mínimo W, máximo W)
-    ("V1", 5, 10),
-    ("V2", 10, 20),
-    ("V3", 20, 35),
+    # (nome,  mínimo W, máximo W)  medições: 3.3, 6.8, 8.2, 9.3, 11.3, 13.8, 15.4
+    ("V1", 1.7, 5.1),
+    ("V2", 5.1, 7.5),
+    ("V3", 7.5, 8.8),
+    ("V4", 8.8, 10.3),
+    ("V5", 10.3, 12.6),
+    ("V6", 12.6, 14.6),
+    ("V7", 14.6, 16.2),
+    ("V8", 16.2, float("inf")),
 ]
 ```
 
