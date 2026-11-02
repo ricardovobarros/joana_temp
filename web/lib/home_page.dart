@@ -19,8 +19,8 @@ class _HomePageState extends State<HomePage> {
     return IndexedStack(
       index: _section == AppSection.sleep ? 0 : 1,
       children: [
-        SleepPage(onSectionSelected: _selectSection),
-        DashboardPage(onSectionSelected: _selectSection),
+        SleepPage(section: _section, onSectionSelected: _selectSection),
+        DashboardPage(section: _section, onSectionSelected: _selectSection),
       ],
     );
   }

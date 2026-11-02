@@ -5,12 +5,18 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'app_section_switch.dart';
 import 'charts.dart';
+import 'device_status.dart';
 import 'fan_card.dart';
 import 'timer_card.dart';
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key, required this.onSectionSelected});
+  const DashboardPage({
+    super.key,
+    required this.section,
+    required this.onSectionSelected,
+  });
 
+  final AppSection section;
   final ValueChanged<AppSection> onSectionSelected;
 
   @override
@@ -102,11 +108,11 @@ class _DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(
         title: const Text('Quarto Jojo'),
         bottom: AppSectionTabs(
-          selected: AppSection.temperature,
+          selected: widget.section,
           onSelected: widget.onSectionSelected,
         ),
         actions: [
-          if (data != null) _DeviceStatus(online: data.deviceOnline),
+          if (data != null) DeviceStatus(online: data.deviceOnline),
           IconButton(
             tooltip: 'Atualizar',
             icon: const Icon(Icons.refresh),
@@ -240,24 +246,3 @@ class _ChartCard extends StatelessWidget {
   }
 }
 
-class _DeviceStatus extends StatelessWidget {
-  const _DeviceStatus({required this.online});
-
-  final bool? online;
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch (online) {
-      true => ('ESP32 online', Colors.greenAccent),
-      false => ('ESP32 offline', Colors.redAccent),
-      null => ('ESP32 ?', Colors.grey),
-    };
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Chip(
-        avatar: Icon(Icons.circle, size: 12, color: color),
-        label: Text(label),
-      ),
-    );
-  }
-}

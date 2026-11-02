@@ -7,13 +7,19 @@ import 'package:intl/intl.dart';
 
 import 'api.dart';
 import 'app_section_switch.dart';
+import 'device_status.dart';
 
 const _dayStartHour = 18;
 const _weekdays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 class SleepPage extends StatefulWidget {
-  const SleepPage({super.key, required this.onSectionSelected});
+  const SleepPage({
+    super.key,
+    required this.section,
+    required this.onSectionSelected,
+  });
 
+  final AppSection section;
   final ValueChanged<AppSection> onSectionSelected;
 
   @override
@@ -84,12 +90,13 @@ class _SleepPageState extends State<SleepPage> {
     final data = _data;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sono do bebé'),
+        title: const Text('Sono da Jojo'),
         bottom: AppSectionTabs(
-          selected: AppSection.sleep,
+          selected: widget.section,
           onSelected: widget.onSectionSelected,
         ),
         actions: [
+          if (data != null) DeviceStatus(online: data.deviceOnline),
           IconButton(
             tooltip: 'Atualizar',
             icon: const Icon(Icons.refresh),
@@ -133,7 +140,11 @@ class _SleepPageState extends State<SleepPage> {
                 busy: _busy,
                 onSetSleeping: _setSleeping,
               );
-              final totalCard = _TotalCard(total: total, since: boundary);
+              final totalCard = _TotalCard(
+                total: total,
+                since: boundary,
+                day: DateTime(_now.year, _now.month, _now.day),
+              );
               return constraints.maxWidth >= 650
                   ? IntrinsicHeight(
                       child: Row(
@@ -245,9 +256,14 @@ class _StatusCard extends StatelessWidget {
 }
 
 class _TotalCard extends StatelessWidget {
-  const _TotalCard({required this.total, required this.since});
+  const _TotalCard({
+    required this.total,
+    required this.since,
+    required this.day,
+  });
   final Duration total;
   final DateTime since;
+  final DateTime day;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -257,7 +273,7 @@ class _TotalCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Sono desde as 18:00',
+            'Sono de hoje · ${DateFormat('d/M').format(day)}',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 12),
@@ -268,7 +284,11 @@ class _TotalCard extends StatelessWidget {
             ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          Text('Contagem desde ${DateFormat('d/M HH:mm').format(since)}'),
+          Text(
+            'Contagem iniciada em ${DateFormat('d/M').format(since)} '
+            'às ${DateFormat('HH:mm').format(since)}',
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     ),
@@ -284,8 +304,9 @@ class _SleepSegment {
 }
 
 class _SleepBucket {
-  _SleepBucket(this.day, this.segments);
+  _SleepBucket(this.day, this.labelDay, this.segments);
   final DateTime day;
+  final DateTime labelDay;
   final List<_SleepSegment> segments;
 }
 
@@ -298,8 +319,10 @@ DateTime _sleepDayStart(DateTime value) {
 
 List<_SleepBucket> _sleepBuckets(List<SleepSession> sessions, DateTime now) {
   final newest = _sleepDayStart(now);
+  final today = DateTime(now.year, now.month, now.day);
   return List.generate(7, (index) {
     final day = newest.subtract(Duration(days: 6 - index));
+    final labelDay = today.subtract(Duration(days: 6 - index));
     final endOfDay = day.add(const Duration(days: 1));
     final segments = <_SleepSegment>[];
     for (final session in sessions) {
@@ -319,7 +342,7 @@ List<_SleepBucket> _sleepBuckets(List<SleepSession> sessions, DateTime now) {
         );
       }
     }
-    return _SleepBucket(day, segments);
+    return _SleepBucket(day, labelDay, segments);
   });
 }
 
@@ -401,7 +424,7 @@ class _SleepChart extends StatelessWidget {
                 if (i < 0 || i >= buckets.length) {
                   return const SizedBox.shrink();
                 }
-                final day = buckets[i].day;
+                final day = buckets[i].labelDay;
                 return SideTitleWidget(
                   meta: meta,
                   child: Text(

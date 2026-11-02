@@ -64,6 +64,7 @@ def sleep_dashboard():
     sessions = db.sleep_sessions_since(db.days_ago(8))
     latest = db.latest_sleep_session()
     return {
+        "device_online": mqtt_bridge.device_online,
         "server_time": db.now_utc().isoformat(),
         "sleeping": latest is not None and latest["ended_at"] is None,
         "last_session": latest,

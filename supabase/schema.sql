@@ -49,8 +49,15 @@ create table if not exists public.sleep_sessions (
     started_at timestamptz not null,
     ended_at timestamptz,
     duration_seconds integer,
-    end_reason text check (end_reason in ('button', 'reboot', 'unknown'))
+    end_reason text check (end_reason in ('button', 'app', 'reboot', 'unknown'))
 );
+
+-- Projetos criados antes do controlo de sono pelo site não aceitavam `app`.
+alter table public.sleep_sessions
+    drop constraint if exists sleep_sessions_end_reason_check;
+alter table public.sleep_sessions
+    add constraint sleep_sessions_end_reason_check
+    check (end_reason in ('button', 'app', 'reboot', 'unknown'));
 
 create index if not exists sleep_sessions_started_at_idx
     on public.sleep_sessions (started_at desc);

@@ -65,13 +65,15 @@ class SleepSession {
 }
 
 class SleepDashboard {
-  SleepDashboard(this.sleeping, this.lastSession, this.sessions);
+  SleepDashboard(this.deviceOnline, this.sleeping, this.lastSession, this.sessions);
 
+  final bool? deviceOnline;
   final bool sleeping;
   final SleepSession? lastSession;
   final List<SleepSession> sessions;
 
   factory SleepDashboard.fromJson(Map<String, dynamic> json) => SleepDashboard(
+    json['device_online'] as bool?,
     json['sleeping'] as bool? ?? false,
     json['last_session'] == null
         ? null
