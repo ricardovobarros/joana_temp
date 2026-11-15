@@ -1,6 +1,6 @@
 # joana_temp: timer e temperatura do quarto
 
-Um ESP32 com um botão e um ecrã OLED funciona como timer (até 12 horas) e mede a temperatura do quarto a cada 15 minutos. Os dados vão por MQTT (EMQX Serverless) para um backend no Fly.io, que os grava no Supabase e serve um site Flutter.
+O app Flutter mantém no Supabase os timers do último tête e do sono do bebé. Eles funcionam mesmo quando o ESP32 está desligado ou sem rede. O ESP32 é um controlo manual opcional com botões e ecrã OLED, e também mede a temperatura do quarto a cada 15 minutos. Os eventos do hardware vão por MQTT (EMQX Serverless) para o backend no Fly.io.
 
 O site também mostra o ventilador do quarto (desligado, ligado e velocidade) e permite desligá-lo, através de uma tomada Shelly Plug M Gen3. Configuração em [VENTILADOR.md](VENTILADOR.md).
 
@@ -48,13 +48,13 @@ Os botões usam o pull-up interno do ESP32, não precisam de resistência.
 - **GPIO 14, segurar 2 segundos:** alterna o timer; mostra `ON`/`OFF` por
   1,5 segundo e `00:01`/`00:00` por mais 1,5 segundo
 - **GPIO 27, clique curto:** restaura a energia da tomada se estiver cortada
-- **GPIO 13, clique curto:** mostra se o bebé está dormindo ou acordado
-- **GPIO 13, segurar 2 segundos:** registra que dormiu/acordou e mostra a
-  saudação e o emoji por 2 segundos cada
+- **GPIO 13, clique curto:** regista que o bebé dormiu e mostra o rostinho a dormir por 3 segundos
+- **GPIO 13, segurar 2 segundos:** regista que o bebé acordou e mostra o rostinho acordado por 3 segundos
 - Fora dessas mensagens, o OLED fica apagado e os timers continuam contando
 - Ao chegar às **12:00** o timer desliga sozinho
-- O site pode **ativar ou desativar** o timer à distância
-- O site pode **registar que o bebé dormiu ou acordou** à distância
+- O site pode **ativar ou desativar** o timer sem depender do ESP32
+- O site pode **registar que o bebé dormiu ou acordou** sem depender do ESP32
+- Quando o ESP32 está online, os comandos do site também são enviados a ele; quando está offline, a gravação no app continua normalmente
 - A temperatura é lida a cada **15 minutos**; sem internet, as leituras e eventos ficam em fila (até 20) e são enviados quando a ligação voltar
 
 Tópicos MQTT (prefixo `joana`):

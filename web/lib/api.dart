@@ -46,40 +46,30 @@ class TimerSession {
   );
 }
 
-class SleepSession {
-  SleepSession(this.startedAt, this.endedAt, this.durationSeconds);
+class SleepEvent {
+  SleepEvent(this.at, this.kind);
 
-  final DateTime startedAt;
-  final DateTime? endedAt;
-  final int? durationSeconds;
+  final DateTime at;
+  final String kind;
 
-  bool get running => endedAt == null;
+  bool get slept => kind == 'sleep';
 
-  factory SleepSession.fromJson(Map<String, dynamic> json) => SleepSession(
-    DateTime.parse(json['started_at'] as String).toLocal(),
-    json['ended_at'] == null
-        ? null
-        : DateTime.parse(json['ended_at'] as String).toLocal(),
-    json['duration_seconds'] as int?,
+  factory SleepEvent.fromJson(Map<String, dynamic> json) => SleepEvent(
+    DateTime.parse(json['at'] as String).toLocal(),
+    json['kind'] as String,
   );
 }
 
 class SleepDashboard {
-  SleepDashboard(this.deviceOnline, this.sleeping, this.lastSession, this.sessions);
+  SleepDashboard(this.deviceOnline, this.events);
 
   final bool? deviceOnline;
-  final bool sleeping;
-  final SleepSession? lastSession;
-  final List<SleepSession> sessions;
+  final List<SleepEvent> events;
 
   factory SleepDashboard.fromJson(Map<String, dynamic> json) => SleepDashboard(
     json['device_online'] as bool?,
-    json['sleeping'] as bool? ?? false,
-    json['last_session'] == null
-        ? null
-        : SleepSession.fromJson(json['last_session'] as Map<String, dynamic>),
-    (json['sessions'] as List? ?? const [])
-        .map((s) => SleepSession.fromJson(s as Map<String, dynamic>))
+    (json['events'] as List? ?? const [])
+        .map((event) => SleepEvent.fromJson(event as Map<String, dynamic>))
         .toList(),
   );
 }

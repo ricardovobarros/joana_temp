@@ -73,14 +73,15 @@ def _handle_state(payload: dict, retained: bool):
     elapsed = int(payload.get("elapsed_s", 0))
     event_at = db.now_utc() - timedelta(seconds=int(payload.get("ago_s", 0)))
 
-    # Mensagens retidas e "sync" só reconciliam o estado: as horas
-    # que trazem podem estar desatualizadas.
+    # O Supabase é a fonte de verdade. Um estado retido/sync do ESP32 pode ser
+    # antigo (por exemplo, o app iniciou o timer enquanto ele estava offline) e
+    # por isso nunca deve abrir ou fechar uma sessão do app.
     if retained or event == "sync":
-        if running:
-            if db.open_session() is None:
-                db.start_session(event_at - timedelta(seconds=elapsed))
-        else:
-            _ensure_closed(db.now_utc(), "reboot")
+        return
+
+    # Confirmações de comandos enviados pelo próprio app já foram persistidas
+    # pelo endpoint HTTP. Ignorá-las evita alterar a hora de início por latência.
+    if payload.get("reason") == "app":
         return
 
     if event == "start":
@@ -92,24 +93,22 @@ def _handle_state(payload: dict, retained: bool):
 
 def _handle_sleep(payload: dict, retained: bool):
     event = payload.get("event")
-    sleeping = bool(payload.get("sleeping"))
     event_at = db.now_utc() - timedelta(seconds=int(payload.get("ago_s", 0)))
-    session = db.open_sleep_session()
 
-    # Mensagem retida/sync reconcilia o estado após uma reinicialização sem
-    # duplicar um toque que o backend já tenha gravado.
+    # Estados retidos/sync podem ser anteriores a uma ação feita no app
+    # enquanto o ESP32 estava offline. Não podem sobrescrever o Supabase.
     if retained or event == "sync":
-        if sleeping and session is None:
-            db.start_sleep_session(event_at)
-        elif not sleeping and session is not None:
-            db.close_sleep_session(session, event_at, "reboot")
         return
 
-    if event == "sleep" and session is None:
-        db.start_sleep_session(event_at)
-    elif event == "wake" and session is not None:
-        db.close_sleep_session(session, event_at, payload.get("reason", "button"))
-    log.info("Bebé: %s", "dormiu" if sleeping else "acordou")
+    # A API já persistiu comandos do app antes de os publicar por MQTT.
+    if payload.get("reason") == "app":
+        return
+
+    if event not in ("sleep", "wake"):
+        return
+
+    db.insert_sleep_event(event_at, event, payload.get("reason", "button"))
+    log.info("Bebé: %s", "dormiu" if event == "sleep" else "acordou")
 
 
 def _update_plug(status: dict):
@@ -224,15 +223,23 @@ def stop():
 def send_command(action: str) -> bool:
     if _client is None or not _client.is_connected():
         return False
-    info = _client.publish(TOPIC_CMD, action, qos=1, retain=False)
-    return info.rc == mqtt.MQTT_ERR_SUCCESS
+    try:
+        info = _client.publish(TOPIC_CMD, action, qos=1, retain=False)
+        return info.rc == mqtt.MQTT_ERR_SUCCESS
+    except Exception:
+        log.exception("Não foi possível espelhar o timer no ESP32")
+        return False
 
 
 def send_sleep_command(action: str) -> bool:
     if _client is None or not _client.is_connected():
         return False
-    info = _client.publish(TOPIC_SLEEP_CMD, action, qos=1, retain=False)
-    return info.rc == mqtt.MQTT_ERR_SUCCESS
+    try:
+        info = _client.publish(TOPIC_SLEEP_CMD, action, qos=1, retain=False)
+        return info.rc == mqtt.MQTT_ERR_SUCCESS
+    except Exception:
+        log.exception("Não foi possível espelhar o sono no ESP32")
+        return False
 
 
 def fan_status() -> dict:

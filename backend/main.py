@@ -22,6 +22,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="joana_temp", lifespan=lifespan)
 
+# O DHT11 lê cerca de 2 °C acima da temperatura do quarto.
+TEMPERATURE_OFFSET_C = -2.0
+
 
 class TimerBody(BaseModel):
     action: Literal["start", "stop"]
@@ -49,7 +52,8 @@ def dashboard():
         "device_online": mqtt_bridge.device_online,
         "server_time": db.now_utc().isoformat(),
         "readings": [
-            {"at": r["created_at"], "t": float(r["temperature_c"]),
+            {"at": r["created_at"],
+             "t": round(float(r["temperature_c"]) + TEMPERATURE_OFFSET_C, 1),
              "h": float(r["humidity"]) if r["humidity"] is not None else None}
             for r in readings
         ],
@@ -61,32 +65,42 @@ def dashboard():
 
 @app.get("/api/sleep")
 def sleep_dashboard():
-    sessions = db.sleep_sessions_since(db.days_ago(8))
-    latest = db.latest_sleep_session()
+    events = db.sleep_events_since(db.days_ago(30))
     return {
         "device_online": mqtt_bridge.device_online,
         "server_time": db.now_utc().isoformat(),
-        "sleeping": latest is not None and latest["ended_at"] is None,
-        "last_session": latest,
-        "sessions": sessions,
+        "events": [
+            {"at": event["happened_at"], "kind": event["kind"]}
+            for event in events
+        ],
     }
 
 
 @app.post("/api/sleep")
 def set_sleep(body: SleepBody):
-    if mqtt_bridge.device_online is False:
-        raise HTTPException(status_code=503, detail="ESP32 offline")
-    if not mqtt_bridge.send_sleep_command(body.action):
-        raise HTTPException(status_code=503, detail="Servidor MQTT indisponível")
+    now = db.now_utc()
+    # Cada toque grava o seu horário. Dormir e acordar não precisam de par.
+    db.insert_sleep_event(now, body.action, "app")
+
+    # O ESP32 é um controlo opcional. Quando estiver ligado, mostra o rostinho;
+    # uma falha de MQTT nunca impede o registo no Supabase.
+    mqtt_bridge.send_sleep_command(body.action)
     return {"ok": True, "action": body.action}
 
 
 @app.post("/api/timer")
 def timer(body: TimerBody):
-    if mqtt_bridge.device_online is False:
-        raise HTTPException(status_code=503, detail="ESP32 offline")
-    if not mqtt_bridge.send_command(body.action):
-        raise HTTPException(status_code=503, detail="Servidor MQTT indisponível")
+    now = db.now_utc()
+    session = db.open_session()
+    if body.action == "start":
+        if session is None:
+            db.start_session(now)
+    elif session is not None:
+        db.close_session(session, now, "app")
+
+    # Publica apenas para manter o hardware alinhado quando ele estiver online.
+    # A fonte de verdade do app é a sessão persistida acima.
+    mqtt_bridge.send_command(body.action)
     return {"ok": True, "action": body.action}
 
 

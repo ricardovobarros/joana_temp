@@ -62,6 +62,9 @@ FONT_8X8 = {
     '7': [0x7F, 0x63, 0x60, 0x30, 0x18, 0x0C, 0x0C, 0x0C],
     '8': [0x3E, 0x63, 0x63, 0x3E, 0x63, 0x63, 0x63, 0x3E],
     '9': [0x3E, 0x63, 0x63, 0x63, 0x7E, 0x60, 0x63, 0x3E],
+    'O': [0x3C, 0x42, 0x42, 0x42, 0x42, 0x42, 0x3C, 0x00],
+    'N': [0x42, 0x62, 0x52, 0x4A, 0x46, 0x42, 0x42, 0x00],
+    'F': [0x7E, 0x02, 0x02, 0x3E, 0x02, 0x02, 0x02, 0x00],
 }
 
 # Bit 0 de cada linha da fonte é o pixel mais à esquerda
@@ -76,6 +79,29 @@ def draw_large_char(char, x, y, scale=3):
                 oled.fill_rect(x + col * scale, y + row * scale, scale, scale, 1)
 
 
+def draw_thin_char(char, x, y, scale=3):
+    """Mesmo tamanho da fonte grande, mas só o traço de 1 pixel (menos luz)."""
+    pattern = FONT_8X8.get(char)
+    if pattern is None:
+        return
+    for row in range(8):
+        bits = pattern[row]
+        below_bits = pattern[row + 1] if row < 7 else 0
+        for col in range(8):
+            if not (bits & (1 << col)):
+                continue
+            px = x + col * scale
+            py = y + row * scale
+            right = col < 7 and bits & (1 << (col + 1))
+            below = below_bits & (1 << col)
+            if right:
+                oled.line(px, py, px + scale, py, 1)
+            if below:
+                oled.line(px, py, px, py + scale, 1)
+            if not right and not below:
+                oled.pixel(px, py, 1)
+
+
 def clear_display():
     oled.fill(0)
     oled.show()
@@ -88,10 +114,23 @@ def display_timer(elapsed_s, colon_on):
     oled.fill(0)
     y = 20
     for char, x in zip(text, (8, 34, 70, 96)):
-        draw_large_char(char, x, y)
+        draw_thin_char(char, x, y)
     if colon_on:
-        oled.fill_rect(61, y + 5, 6, 6, 1)
-        oled.fill_rect(61, y + 15, 6, 6, 1)
+        oled.fill_rect(62, y + 7, 2, 2, 1)
+        oled.fill_rect(62, y + 16, 2, 2, 1)
+    oled.show()
+
+
+def display_banner(text, scale=5):
+    """ON/OFF grandes, com o mesmo traço fino dos números."""
+    width = 8 * scale
+    gap = 4
+    total = len(text) * width + max(0, len(text) - 1) * gap
+    x0 = max(0, (128 - total) // 2)
+    y = max(0, (64 - 8 * scale) // 2)
+    oled.fill(0)
+    for index, char in enumerate(text):
+        draw_thin_char(char, x0 + index * (width + gap), y, scale)
     oled.show()
 
 
@@ -153,6 +192,8 @@ def _draw_display_step(kind, value=None):
         display_timer(value, True)
     elif kind == "baby":
         display_baby(value)
+    elif kind == "banner":
+        display_banner(value)
     else:
         display_text(value)
 
@@ -221,7 +262,7 @@ def start_timer(reason):
     last_drawn = None
     print("Timer ligado ({})".format(reason))
     publish_state("start", reason, 0)
-    show_sequence((("text", "ON", 1500), ("timer", 1, 1500)))
+    show_sequence((("banner", "ON", 1500), ("timer", 1, 1500)))
 
 
 def stop_timer(reason):
@@ -233,7 +274,7 @@ def stop_timer(reason):
     last_drawn = None
     print("Timer desligado ({}) após {} s".format(reason, elapsed))
     publish_state("stop", reason, elapsed)
-    show_sequence((("text", "OFF", 1500), ("timer", 0, 1500)))
+    show_sequence((("banner", "OFF", 1500), ("timer", 0, 1500)))
 
 
 def update_timer():
@@ -312,24 +353,23 @@ def publish_sleep(event, reason="button"):
 
 
 def sleep_click():
-    show_sequence((("baby", baby_sleeping, 3000),))
+    # Clique curto: o bebé dormiu. Não depende de haver um "acordou" antes.
+    mark_baby(True, "button")
 
 
 def sleep_long_press():
-    set_baby_sleeping(not baby_sleeping, "button")
+    # Segurar: o bebé acordou. Também é um registo independente.
+    mark_baby(False, "button")
 
 
-def set_baby_sleeping(sleeping, reason):
+def mark_baby(sleeping, reason):
     global baby_sleeping
-    if baby_sleeping != sleeping:
-        baby_sleeping = sleeping
-        if _sleep_nvs is not None:
-            _sleep_nvs.set_i32("sleeping", int(baby_sleeping))
-            _sleep_nvs.commit()
-    # Publica também quando o estado já coincide, para reconciliar o backend.
-    publish_sleep("sleep" if baby_sleeping else "wake", reason)
-    greeting = "GOOD NIGHT" if baby_sleeping else "GOOD MORNING"
-    show_sequence((("text", greeting, 2000), ("baby", baby_sleeping, 2000)))
+    baby_sleeping = sleeping
+    if _sleep_nvs is not None:
+        _sleep_nvs.set_i32("sleeping", int(baby_sleeping))
+        _sleep_nvs.commit()
+    publish_sleep("sleep" if sleeping else "wake", reason)
+    show_sequence((("baby", sleeping, 3000),))
 
 
 buttons = (
@@ -392,9 +432,9 @@ def on_message(topic, msg):
             stop_timer("app")
     elif topic == TOPIC_SLEEP_CMD.encode():
         if command == "sleep":
-            set_baby_sleeping(True, "app")
+            mark_baby(True, "app")
         elif command == "wake":
-            set_baby_sleeping(False, "app")
+            mark_baby(False, "app")
 
 
 def make_client():

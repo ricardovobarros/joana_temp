@@ -70,8 +70,6 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() => _busy = true);
     try {
       await Api.setTimer(on);
-      // Dá tempo ao ESP32 para executar e ao backend para gravar
-      await Future.delayed(const Duration(seconds: 2));
       await _load();
     } catch (e) {
       if (mounted) {
@@ -245,4 +243,3 @@ class _ChartCard extends StatelessWidget {
     );
   }
 }
-
