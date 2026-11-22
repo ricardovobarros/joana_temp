@@ -45,8 +45,7 @@ Os botões usam o pull-up interno do ESP32, não precisam de resistência.
 ## Funcionamento
 
 - **GPIO 14, clique curto:** mostra o tempo por 3 segundos
-- **GPIO 14, segurar 2 segundos:** alterna o timer; mostra `ON`/`OFF` por
-  1,5 segundo e `00:01`/`00:00` por mais 1,5 segundo
+- **GPIO 14, segurar 2 segundos:** recomeça o timer do zero. Se já estava a contar, essa sessão fecha e começa outra
 - **GPIO 27, clique curto:** restaura a energia da tomada se estiver cortada
 - **GPIO 13, clique curto:** regista que o bebé dormiu e mostra o rostinho a dormir por 3 segundos
 - **GPIO 13, segurar 2 segundos:** regista que o bebé acordou e mostra o rostinho acordado por 3 segundos

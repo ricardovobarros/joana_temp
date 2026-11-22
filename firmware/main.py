@@ -321,10 +321,15 @@ def timer_click():
 
 
 def timer_long_press():
+    # Segurar recomeça do zero. Se já havia uma contagem, ela fica fechada
+    # como sessão anterior, sem um comando só para parar.
+    global timer_running, last_drawn
     if timer_running:
-        stop_timer("button")
-    else:
-        start_timer("button")
+        elapsed = min(timer_elapsed_s(), TIMER_MAX_S)
+        timer_running = False
+        last_drawn = None
+        publish_state("stop", "button", elapsed)
+    start_timer("button")
 
 
 def power_override_click():
